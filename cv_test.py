@@ -3,9 +3,10 @@ OpenCV Haar级联器人脸检测测试
 使用OpenCV的Haar级联分类器进行人脸检测
 """
 
-import cv2
-import numpy as np
+import os
 import time
+
+import cv2
 
 
 class HaarFaceDetector:
@@ -18,16 +19,36 @@ class HaarFaceDetector:
         Args:
             cascade_path: Haar级联分类器文件路径
         """
-        try:
-            self.face_cascade = cv2.CascadeClassifier(cascade_path)
-            if self.face_cascade.empty():
-                raise ValueError(f"无法加载级联分类器: {cascade_path}")
-        except Exception as e:
-            print(f"初始化Haar级联分类器失败: {e}")
-            # 尝试使用OpenCV内置的级联分类器
+        self.face_cascade = None
+
+        # 尝试多个路径来加载级联分类器
+        paths_to_try = [
+            cascade_path,  # 相对路径
+            os.path.join(os.path.dirname(__file__), cascade_path),  # 相对于脚本目录
+            os.path.join(os.getcwd(), cascade_path),  # 相对于当前工作目录
+            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'  # OpenCV内置
+        ]
+
+        for path in paths_to_try:
+            try:
+                if os.path.exists(path) or 'cv2.data' in path:
+                    cascade = cv2.CascadeClassifier(path)
+                    if not cascade.empty():
+                        self.face_cascade = cascade
+                        print(f"成功加载级联分类器: {path}")
+                        return
+            except Exception as e:
+                print(f"尝试加载 {path} 失败: {e}")
+                continue
+
+        # 如果所有路径都失败，使用OpenCV内置的
+        if self.face_cascade is None:
+            print("使用OpenCV内置的级联分类器")
             self.face_cascade = cv2.CascadeClassifier(
                 cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
             )
+            if self.face_cascade.empty():
+                raise ValueError("无法加载任何级联分类器")
     
     def detect(self, frame):
         """
