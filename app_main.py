@@ -180,6 +180,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(algo_group)
         
         # 统计信息
+        #111
         stats_group = QGroupBox('统计信息')
         stats_layout = QVBoxLayout()
         
