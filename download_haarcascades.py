@@ -4,8 +4,8 @@
 """
 
 import os
-import urllib.request
 import sys
+import urllib.request
 
 # Haar级联分类器文件列表
 HAARCASCADES = {

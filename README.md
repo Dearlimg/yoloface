@@ -30,6 +30,16 @@
 pip install -r requirements.txt
 ```
 
+### 下载Haar级联分类器（可选）
+
+如果需要使用本地的Haar级联分类器文件，可以运行以下命令：
+
+```bash
+python download_haarcascades.py
+```
+
+**注意**: 程序会自动使用OpenCV内置的级联分类器，所以这一步是可选的。本地文件可以提高加载速度。
+
 ## 使用方法
 
 ### 安装
