@@ -1,0 +1,65 @@
+# 基于EAIDK-310的人脸识别系统配置文件
+
+# 摄像头配置
+camera:
+  index: 0          # 摄像头索引
+  width: 640        # 视频宽度
+  height: 480       # 视频高度
+  fps: 30           # 帧率
+
+# 检测算法配置
+detection:
+  # Haar级联器配置
+  haar:
+    cascade_path: null  # null表示使用OpenCV内置
+    scale_factor: 1.1
+    min_neighbors: 5
+    min_size: [30, 30]
+  
+  # YOLO11配置
+  yolo11:
+    model_path: "data/models/yolo11n.pt"
+    conf_threshold: 0.25
+    iou_threshold: 0.45
+    imgsz: 640
+  
+  # Yolo-FastestV2配置
+  fastestv2:
+    model_path: "yolo_fastestv2/model.onnx"
+    conf_threshold: 0.25
+    imgsz: 416
+  
+  # 跟踪配置
+  tracking:
+    iou_threshold: 0.3
+    max_history: 30
+    track_lost_threshold: 5
+
+# GUI配置
+gui:
+  window_title: "基于EAIDK-310的人脸识别系统"
+  window_width: 1200
+  window_height: 800
+  video_width: 640
+  video_height: 480
+
+# 路径配置
+paths:
+  models_dir: "data/models"
+  haarcascades_dir: "data/haarcascades"
+  output_dir: "data/output"
+  logs_dir: "logs"
+
+# 日志配置
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/app.log"
+  console: true
+
+# 性能配置
+performance:
+  fps_update_interval: 30
+  enable_multiprocess: false
+  num_processes: 2
+
