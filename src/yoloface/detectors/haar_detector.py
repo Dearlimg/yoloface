@@ -4,6 +4,7 @@ Haar级联分类器人脸检测器
 
 import cv2
 import numpy as np
+import os
 from typing import List, Tuple, Optional
 
 from ..utils.logger import get_logger
@@ -30,22 +31,42 @@ class HaarFaceDetector:
             cascade_path = config.get('detection.haar.cascade_path')
         
         # 加载级联分类器
-        try:
-            if cascade_path:
-                self.face_cascade = cv2.CascadeClassifier(cascade_path)
-                if self.face_cascade.empty():
-                    raise ValueError(f"无法加载级联分类器: {cascade_path}")
-                logger.info(f"加载级联分类器: {cascade_path}")
-            else:
-                # 使用OpenCV内置的级联分类器
-                default_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-                self.face_cascade = cv2.CascadeClassifier(default_path)
-                logger.info("使用OpenCV内置级联分类器")
-        except Exception as e:
-            logger.warning(f"初始化级联分类器失败: {e}，使用默认分类器")
+        self.face_cascade = None
+
+        # 尝试多个路径来加载级联分类器
+        paths_to_try = []
+
+        if cascade_path:
+            paths_to_try.extend([
+                cascade_path,  # 相对路径
+                os.path.join(os.path.dirname(__file__), '../../..', cascade_path),  # 相对于项目根目录
+                os.path.join(os.getcwd(), cascade_path),  # 相对于当前工作目录
+            ])
+
+        # 添加OpenCV内置路径
+        paths_to_try.append(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+        for path in paths_to_try:
+            try:
+                if os.path.exists(path) or 'cv2.data' in path:
+                    cascade = cv2.CascadeClassifier(path)
+                    if not cascade.empty():
+                        self.face_cascade = cascade
+                        logger.info(f"成功加载级联分类器: {path}")
+                        break
+            except Exception as e:
+                logger.debug(f"尝试加载 {path} 失败: {e}")
+                continue
+
+        # 如果所有路径都失败，使用OpenCV内置的
+        if self.face_cascade is None:
+            logger.warning("使用OpenCV内置级联分类器")
             self.face_cascade = cv2.CascadeClassifier(
                 cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
             )
+            if self.face_cascade.empty():
+                logger.error("无法加载任何级联分类器")
+                raise ValueError("无法加载任何级联分类器")
         
         # 检测参数
         self.scale_factor = kwargs.get('scale_factor') or config.get('detection.haar.scale_factor', 1.1)
