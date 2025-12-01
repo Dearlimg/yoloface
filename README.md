@@ -92,7 +92,7 @@ python yolo_fastestv2_test.py
 
 ## 项目结构
 
-项目采用工程化的模块结构，详见 [STRUCTURE.md](STRUCTURE.md)
+项目采用工程化的模块结构，详见 [STRUCTURE.md](doc/STRUCTURE.md)
 
 ```
 yoloface/
@@ -107,6 +107,11 @@ yoloface/
 ├── data/                   # 数据目录
 │   ├── models/            # 模型文件
 │   └── haarcascades/      # Haar级联分类器
+├── doc/                    # 文档目录
+│   ├── USAGE.md          # 使用说明
+│   ├── STRUCTURE.md       # 项目结构
+│   ├── PROJECT_SUMMARY.md # 项目总结
+│   └── ...                # 其他文档
 ├── config.yaml            # 配置文件
 ├── requirements.txt       # Python依赖
 ├── setup.py               # 安装脚本
@@ -131,6 +136,16 @@ yoloface/
 - 轻量级快速检测模型
 - 适合嵌入式设备
 - 平衡精度和速度
+
+## 文档
+
+更多详细文档请查看 `doc/` 目录：
+
+- [使用说明](doc/USAGE.md) - 详细的使用指南和常见问题
+- [项目结构](doc/STRUCTURE.md) - 项目结构详细说明
+- [项目总结](doc/PROJECT_SUMMARY.md) - 项目完成情况总结
+- [重构说明](doc/REFACTORING.md) - 项目重构和改进说明
+- [文件清单](doc/FILES.md) - 项目文件清单
 
 ## 开发说明
 
