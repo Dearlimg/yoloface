@@ -6,7 +6,7 @@
 
 ```bash
 # 方法1: 使用安装脚本（推荐）
-./install.sh
+./scripts/install.sh
 
 # 方法2: 手动安装
 pip install -r requirements.txt
@@ -15,7 +15,14 @@ pip install -r requirements.txt
 ### 2. 运行主程序
 
 ```bash
-python app_main.py
+# 方式1: 作为模块运行（推荐）
+python -m yoloface.app
+
+# 方式2: 使用Makefile
+make run
+
+# 方式3: 如果已安装包
+yoloface
 ```
 
 主程序会打开一个PyQt5图形界面，你可以：
@@ -24,51 +31,13 @@ python app_main.py
 - 查看FPS和检测数量统计
 - 查看运行日志
 
-### 3. 单独测试各个模块
-
-#### 测试OpenCV Haar级联器
-```bash
-python cv_test.py
-```
-- 按 'q' 键退出
-- 显示实时FPS和检测到的人脸数量
-
-#### 测试YOLO11
-```bash
-python yolo_test.py
-```
-- 首次运行会自动下载YOLO11预训练模型
-- 按 'q' 键退出
-
-#### 测试YOLO11多进程版本
-```bash
-python yolo_test_multiprocess.py
-```
-- 使用多进程提高检测性能
-- 适合多核CPU环境
-
-#### 测试人脸跟踪
-```bash
-python yolo_track.py
-```
-- 实现人脸跟踪功能
-- 每个跟踪目标有唯一ID和颜色
-- 显示跟踪轨迹
-
-#### 测试Yolo-FastestV2
-```bash
-python yolo_fastestv2_test.py
-```
-- 需要先准备Yolo-FastestV2的ONNX模型
-- 如果模型不存在，会自动使用Haar级联器作为替代
-
 ## 模型导出
 
 如果需要将模型部署到EAIDK-310开发板，可以使用导出工具：
 
 ```bash
 # 导出为ONNX格式
-python exporter.py --model models/yolo11n.pt --format onnx
+python scripts/exporter.py --model models/yolo11n.pt --format onnx
 
 # 导出为NCNN格式（用于EAIDK-310）
 python exporter.py --model models/yolo11n.pt --format ncnn
@@ -129,13 +98,16 @@ python exporter.py --model models/yolo11n.pt --format all --imgsz 640
 ### 项目结构
 ```
 yoloface/
-├── app_main.py              # 主程序（GUI）
+├── src/yoloface/app.py      # 应用入口
 ├── cv_test.py              # Haar级联器测试
 ├── yolo_test.py            # YOLO11测试
 ├── yolo_test_multiprocess.py  # YOLO11多进程测试
 ├── yolo_track.py           # 人脸跟踪测试
 ├── yolo_fastestv2_test.py  # Yolo-FastestV2测试
-├── exporter.py             # 模型导出工具
+├── scripts/                # 脚本目录
+│   ├── exporter.py         # 模型导出工具
+│   ├── check_imports.py    # 依赖检查
+│   └── download_haarcascades.py  # Haar级联分类器下载
 ├── requirements.txt        # 依赖列表
 ├── haarcascades/           # Haar级联分类器
 ├── models/                 # 模型文件
@@ -146,7 +118,7 @@ yoloface/
 
 1. **添加新的检测算法**
    - 创建新的检测器类，实现`detect()`和`draw_detections()`方法
-   - 在`app_main.py`中添加相应的选项
+   - 在`src/yoloface/gui/main_window.py`中添加相应的选项
 
 2. **自定义模型训练**
    - 使用Ultralytics YOLO进行自定义训练

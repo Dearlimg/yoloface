@@ -38,29 +38,31 @@
 
 ```
 yoloface/
-├── app_main.py                    # 主程序（PyQt5 GUI）
-├── cv_test.py                     # OpenCV Haar级联器测试
-├── yolo_test.py                   # YOLO11测试
-├── yolo_test_multiprocess.py      # YOLO11多进程测试
-├── yolo_track.py                  # 人脸跟踪测试
-├── yolo_fastestv2_test.py         # Yolo-FastestV2测试
-├── exporter.py                    # 模型导出工具
-├── requirements.txt               # Python依赖
-├── install.sh                     # 安装脚本
-├── README.md                      # 项目说明（根目录）
+├── src/yoloface/                  # 源代码包
+│   ├── app.py                     # 应用入口
+│   ├── detectors/                 # 检测器模块
+│   ├── utils/                     # 工具模块
+│   ├── config/                    # 配置管理
+│   └── gui/                       # GUI模块
+├── tests/                         # 测试目录
 ├── doc/                           # 文档目录
 │   ├── USAGE.md                   # 使用说明
 │   ├── PROJECT_SUMMARY.md        # 项目总结（本文件）
 │   ├── STRUCTURE.md               # 项目结构
-│   ├── REFACTORING.md             # 重构说明
-│   ├── FILES.md                   # 文件清单
-│   └── TROUBLESHOOTING.md         # 故障排除
-├── .gitignore                     # Git忽略文件
-├── haarcascades/                  # Haar级联分类器目录
-│   └── README.md
+│   └── ...                        # 其他文档
+├── scripts/                       # 脚本目录
+│   ├── exporter.py                # 模型导出工具
+│   ├── check_imports.py           # 依赖检查
+│   ├── download_haarcascades.py   # Haar级联分类器下载
+│   └── install.sh                 # 安装脚本
+├── requirements.txt               # Python依赖
+├── config.yaml                    # 配置文件
+├── setup.py                       # 安装脚本
+├── Makefile                       # Make命令
 ├── models/                        # 模型文件目录
 │   └── README.md
-└── yolo_fastestv2/                # Yolo-FastestV2模型目录
+└── haarcascades/                  # Haar级联分类器目录
+    └── README.md
 ```
 
 ## 技术栈
@@ -73,40 +75,39 @@ yoloface/
 
 ## 核心模块说明
 
-### 1. Haar级联器检测 (`cv_test.py`)
+### 1. Haar级联器检测
 - 使用OpenCV的Haar级联分类器
 - 速度快，资源占用少
 - 适合实时检测场景
+- 实现位置：`src/yoloface/detectors/haar_detector.py`
 
-### 2. YOLO11检测 (`yolo_test.py`)
+### 2. YOLO11检测
 - 使用Ultralytics YOLO11模型
 - 检测精度高
 - 支持多种输入尺寸
 - 自动下载预训练模型
+- 实现位置：`src/yoloface/detectors/yolo11_detector.py`
 
-### 3. 多进程检测 (`yolo_test_multiprocess.py`)
-- 使用多进程提高检测性能
-- 适合多核CPU环境
-- 异步处理，提高吞吐量
+### 3. Yolo-FastestV2检测
+- 轻量级快速检测模型
+- 适合嵌入式设备
+- 需要ONNX格式模型
+- 实现位置：`src/yoloface/detectors/fastestv2_detector.py`
 
-### 4. 人脸跟踪 (`yolo_track.py`)
+### 4. 人脸跟踪
 - 基于IoU匹配的跟踪算法
 - 为每个目标分配唯一ID
 - 显示跟踪轨迹
 - 支持多目标跟踪
+- 实现位置：`src/yoloface/detectors/face_tracker.py`
 
-### 5. Yolo-FastestV2 (`yolo_fastestv2_test.py`)
-- 轻量级快速检测模型
-- 适合嵌入式设备
-- 需要ONNX格式模型
-
-### 6. 主程序 (`app_main.py`)
+### 5. 主程序 (`src/yoloface/app.py`)
 - PyQt5图形界面
 - 集成所有检测算法
 - 实时视频显示
 - 性能统计和日志
 
-### 7. 模型导出 (`exporter.py`)
+### 6. 模型导出 (`exporter.py`)
 - 支持导出为ONNX格式
 - 支持导出为NCNN格式（EAIDK-310）
 - 支持导出为TensorRT格式
@@ -115,14 +116,14 @@ yoloface/
 
 1. **安装依赖**
    ```bash
-   ./install.sh
+   ./scripts/install.sh
    # 或
    pip install -r requirements.txt
    ```
 
 2. **运行主程序**
    ```bash
-   python app_main.py
+   python -m yoloface.app
    ```
 
 3. **选择算法并开始检测**
@@ -132,7 +133,7 @@ yoloface/
 
 4. **导出模型（可选）**
    ```bash
-   python exporter.py --model models/yolo11n.pt --format ncnn
+   python scripts/exporter.py --model models/yolo11n.pt --format ncnn
    ```
 
 ## 课程设计要求对照

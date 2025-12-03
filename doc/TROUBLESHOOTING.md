@@ -20,7 +20,7 @@
 **方案A: 下载本地Haar级联分类器文件**
 
 ```bash
-python download_haarcascades.py
+python scripts/download_haarcascades.py
 ```
 
 这会将以下文件下载到 `haarcascades/` 目录：
@@ -46,7 +46,7 @@ python download_haarcascades.py
 运行下载脚本来获取本地文件：
 
 ```bash
-python download_haarcascades.py
+python scripts/download_haarcascades.py
 ```
 
 这样程序就能快速找到文件，而不需要尝试多个路径。
@@ -84,7 +84,7 @@ detector = HaarFaceDetector('haarcascades/haarcascade_frontalface_alt.xml')
 
 ```bash
 # 在GUI中选择不同的算法
-python app_main.py
+python -m yoloface.app
 ```
 
 ### 4. 导入错误
@@ -104,7 +104,7 @@ python app_main.py
 3. 在项目根目录运行程序：
    ```bash
    cd /path/to/yoloface
-   python app_main.py
+   python -m yoloface.app
    ```
 
 ### 5. 摄像头无法打开
@@ -116,7 +116,7 @@ python app_main.py
 3. 尝试使用其他摄像头索引：
 
 ```python
-# 在 app_main.py 中修改
+# 在 src/yoloface/gui/main_window.py 中修改
 self.cap = cv2.VideoCapture(1)  # 尝试第二个摄像头
 ```
 
@@ -151,6 +151,6 @@ logging:
 
 - `cv_test.py` - Haar级联器检测器实现
 - `src/yoloface/detectors/haar_detector.py` - 模块化Haar检测器
-- `download_haarcascades.py` - 下载级联分类器脚本
+- `scripts/download_haarcascades.py` - 下载级联分类器脚本
 - `haarcascades/` - 级联分类器文件目录
 

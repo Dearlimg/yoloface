@@ -18,8 +18,10 @@ HAARCASCADES = {
 def download_haarcascades():
     """下载Haar级联分类器文件"""
 
-    # 创建haarcascades目录
-    haarcascades_dir = os.path.join(os.path.dirname(__file__), 'haarcascades')
+    # 创建haarcascades目录（相对于项目根目录）
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    haarcascades_dir = os.path.join(project_root, 'haarcascades')
     os.makedirs(haarcascades_dir, exist_ok=True)
 
     print(f"下载Haar级联分类器到: {haarcascades_dir}")
