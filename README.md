@@ -141,6 +141,8 @@ yoloface/
 
 更多详细文档请查看 `doc/` 目录：
 
+- [系统架构图](doc/ARCHITECTURE.md) - 详细的系统架构图和设计说明
+- [系统架构图（简化版）](doc/ARCHITECTURE_SIMPLE.md) - 快速查看的简化架构图
 - [使用说明](doc/USAGE.md) - 详细的使用指南和常见问题
 - [项目结构](doc/STRUCTURE.md) - 项目结构详细说明
 - [项目总结](doc/PROJECT_SUMMARY.md) - 项目完成情况总结
