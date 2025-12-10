@@ -176,6 +176,36 @@ class HaarFaceDetector:
 
         return detections
 
+    def detect_with_age_and_gender(self, frame):
+        """
+        检测人脸并同时识别年龄和性别
+
+        Args:
+            frame: 输入图像帧
+
+        Returns:
+            detections: 检测结果列表，每个元素为 (x, y, w, h, age_label, age_range, age_conf, gender, gender_conf)
+        """
+        faces = self.detect(frame)
+
+        detections = []
+        for x, y, w, h in faces:
+            # 检测年龄
+            if self.age_detector is not None:
+                age_label, age_range, age_conf = self.age_detector.detect_age(frame, (x, y, x + w, y + h))
+            else:
+                age_label, age_range, age_conf = 'Unknown', (0, 0), 0.0
+
+            # 检测性别
+            if self.gender_detector is not None:
+                gender, gender_conf = self.gender_detector.detect_gender(frame, (x, y, x + w, y + h))
+            else:
+                gender, gender_conf = 'Unknown', 0.0
+
+            detections.append((x, y, w, h, age_label, age_range, age_conf, gender, gender_conf))
+
+        return detections
+
     def draw_detections_with_age(self, frame, detections):
         """
         在图像上绘制检测结果和年龄信息
@@ -205,6 +235,43 @@ class HaarFaceDetector:
             # 绘制标签
             label = f'{age_label} {age_conf:.2f}'
             cv2.putText(frame, label, (x, y - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+        return frame
+
+    def draw_detections_with_age_and_gender(self, frame, detections):
+        """
+        在图像上绘制检测结果、年龄和性别信息
+
+        Args:
+            frame: 输入图像帧
+            detections: 检测结果列表 (x, y, w, h, age_label, age_range, age_conf, gender, gender_conf)
+
+        Returns:
+            frame: 绘制了检测框、年龄和性别信息的图像
+        """
+        from age_detector import AgeDetector
+
+        for detection in detections:
+            if len(detection) == 9:
+                x, y, w, h, age_label, age_range, age_conf, gender, gender_conf = detection
+            else:
+                continue
+
+            # 根据年龄段选择颜色
+            color = AgeDetector.get_age_color(age_label)
+
+            # 绘制边界框
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+
+            # 绘制年龄标签
+            age_label_text = f'{age_label} {age_conf:.2f}'
+            cv2.putText(frame, age_label_text, (x, y - 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+            # 绘制性别标签
+            gender_label_text = f'{gender} {gender_conf:.2f}'
+            cv2.putText(frame, gender_label_text, (x, y - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
         return frame

@@ -15,14 +15,14 @@ class AgeDetector:
 
     # 年龄段定义
     AGE_RANGES = {
-        'child': (0, 12),      # 儿童
-        'teen': (13, 19),      # 青少年
-        'young_adult': (20, 35),  # 年轻成人
-        'adult': (36, 50),     # 中年
-        'senior': (51, 100)    # 老年
+        'child': (0, 12),      # Child
+        'teen': (13, 19),      # Teen
+        'young_adult': (20, 35),  # Young Adult
+        'adult': (36, 50),     # Adult
+        'senior': (51, 100)    # Senior
     }
 
-    AGE_LABELS = ['儿童(0-12)', '青少年(13-19)', '年轻成人(20-35)', '中年(36-50)', '老年(51+)']
+    AGE_LABELS = ['Child(0-12)', 'Teen(13-19)', 'Young(20-35)', 'Adult(36-50)', 'Senior(51+)']
 
     def __init__(self, model_type='simple'):
         """
@@ -342,12 +342,12 @@ class AgeDetector:
             color: BGR 颜色元组
         """
         color_map = {
-            '儿童(0-12)': (0, 255, 255),      # 黄色
-            '青少年(13-19)': (255, 0, 255),   # 紫色
-            '年轻成人(20-35)': (0, 255, 0),   # 绿色
-            '中年(36-50)': (0, 165, 255),     # 橙色
-            '老年(51+)': (255, 0, 0),         # 蓝色
-            'Unknown': (128, 128, 128)        # 灰色
+            'Child(0-12)': (0, 255, 255),      # Yellow
+            'Teen(13-19)': (255, 0, 255),      # Magenta
+            'Young(20-35)': (0, 255, 0),       # Green
+            'Adult(36-50)': (0, 165, 255),     # Orange
+            'Senior(51+)': (255, 0, 0),        # Blue
+            'Unknown': (128, 128, 128)         # Gray
         }
         return color_map.get(age_label, (128, 128, 128))
 

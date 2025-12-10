@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 
 from age_detector import AgeDetector
 from cv_test import HaarFaceDetector
+from gender_detector import GenderDetector
 from login_ui import LoginRegisterDialog
 from yolo_fastestv2_test import YoloFastestV2Detector
 from yolo_test import YOLO11FaceDetector
@@ -111,17 +112,43 @@ class VideoThread(QThread):
                 frame = self.tracker.draw_tracks(frame, tracks)
                 detection_count = len(tracks)
             elif self.detector_type in ['haar', 'yolo11']:
-                if self.enable_gender and hasattr(self.detector, 'detect_with_gender'):
+                if self.enable_age and self.enable_gender and hasattr(self.detector, 'detect_with_age_and_gender'):
+                    # 同时启用年龄和性别识别
+                    detections = self.detector.detect_with_age_and_gender(frame)
+                    frame = self.detector.draw_detections_with_age_and_gender(frame, detections)
+                elif self.enable_age and hasattr(self.detector, 'detect_with_age'):
+                    # 仅启用年龄识别
+                    detections = self.detector.detect_with_age(frame)
+                    frame = self.detector.draw_detections_with_age(frame, detections)
+                elif self.enable_gender and hasattr(self.detector, 'detect_with_gender'):
+                    # 仅启用性别识别
                     detections = self.detector.detect_with_gender(frame)
                     frame = self.detector.draw_detections_with_gender(frame, detections)
                 else:
+                    # 基础检测
                     faces = self.detector.detect(frame)
                     frame = self.detector.draw_detections(frame, faces)
-                detection_count = len(detections) if self.enable_gender else len(faces)
+                    detections = faces
+                detection_count = len(detections)
             elif self.detector_type == 'fastestv2':
                 faces = self.detector.detect(frame)
-                if self.enable_gender and self.gender_detector:
-                    # 为 FastestV2 检测结果添加性别识别
+                if self.enable_age and self.enable_gender and self.age_detector and self.gender_detector:
+                    # 同时启用年龄和性别识别
+                    detections_with_age_and_gender = []
+                    for x1, y1, x2, y2, conf, cls in faces:
+                        age_label, age_range, age_conf = self.age_detector.detect_age(frame, (x1, y1, x2, y2))
+                        gender, gender_conf = self.gender_detector.detect_gender(frame, (x1, y1, x2, y2))
+                        detections_with_age_and_gender.append((x1, y1, x2, y2, conf, cls, age_label, age_range, age_conf, gender, gender_conf))
+                    frame = self._draw_detections_with_age_and_gender(frame, detections_with_age_and_gender)
+                elif self.enable_age and self.age_detector:
+                    # 仅启用年龄识别
+                    detections_with_age = []
+                    for x1, y1, x2, y2, conf, cls in faces:
+                        age_label, age_range, age_conf = self.age_detector.detect_age(frame, (x1, y1, x2, y2))
+                        detections_with_age.append((x1, y1, x2, y2, conf, cls, age_label, age_range, age_conf))
+                    frame = self._draw_detections_with_age(frame, detections_with_age)
+                elif self.enable_gender and self.gender_detector:
+                    # 仅启用性别识别
                     detections_with_gender = []
                     for x1, y1, x2, y2, conf, cls in faces:
                         gender, gender_conf = self.gender_detector.detect_gender(frame, (x1, y1, x2, y2))
@@ -145,8 +172,15 @@ class VideoThread(QThread):
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.putText(frame, f'Detections: {detection_count}', (10, 70),
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            # 显示启用的功能
+            y_offset = 110
             if self.enable_gender:
-                cv2.putText(frame, 'Gender Detection: ON', (10, 110),
+                cv2.putText(frame, 'Gender Detection: ON', (10, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                y_offset += 30
+            if self.enable_age:
+                cv2.putText(frame, 'Age Detection: ON', (10, y_offset),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
             
             # 发送帧
@@ -173,6 +207,47 @@ class VideoThread(QThread):
             # 绘制标签
             label = f'{gender} {gender_conf:.2f}'
             cv2.putText(frame, label, (x1, y1 - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+        return frame
+
+    def _draw_detections_with_age(self, frame, detections):
+        """绘制带年龄信息的检测结果"""
+        from age_detector import AgeDetector
+
+        for x1, y1, x2, y2, conf, cls, age_label, age_range, age_conf in detections:
+            # 根据年龄段选择颜色
+            color = AgeDetector.get_age_color(age_label)
+
+            # 绘制边界框
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            # 绘制标签
+            label = f'{age_label} {age_conf:.2f}'
+            cv2.putText(frame, label, (x1, y1 - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+        return frame
+
+    def _draw_detections_with_age_and_gender(self, frame, detections):
+        """绘制带年龄和性别信息的检测结果"""
+        from age_detector import AgeDetector
+
+        for x1, y1, x2, y2, conf, cls, age_label, age_range, age_conf, gender, gender_conf in detections:
+            # 根据年龄段选择颜色
+            color = AgeDetector.get_age_color(age_label)
+
+            # 绘制边界框
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            # 绘制年龄标签
+            age_label_text = f'{age_label} {age_conf:.2f}'
+            cv2.putText(frame, age_label_text, (x1, y1 - 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+            # 绘制性别标签
+            gender_label_text = f'{gender} {gender_conf:.2f}'
+            cv2.putText(frame, gender_label_text, (x1, y1 - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
         return frame
