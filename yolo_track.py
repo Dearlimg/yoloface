@@ -36,6 +36,7 @@ class FaceTracker:
         self.track_history = defaultdict(list)
         self.track_colors = {}
         self.track_genders = {}  # 存储每个跟踪ID的性别信息
+        self.track_ages = {}     # 存储每个跟踪ID的年龄信息
         self.next_track_id = 0
     
         # 初始化性别识别器
@@ -46,6 +47,10 @@ class FaceTracker:
                 self.gender_detector = GenderDetector(model_type='simple')
             except Exception as e:
                 print(f"初始化性别识别器失败: {e}")
+
+        # 初始化年龄识别器
+        self.age_detector = None
+        self.enable_age = False
 
     def calculate_iou(self, box1, box2):
         """
@@ -126,6 +131,16 @@ class FaceTracker:
                 else:
                     current_tracks[track_id] = det
 
+                # 检测年龄（如果启用）
+                if self.age_detector is not None and frame is not None:
+                    age_label, age_range, age_conf = self.age_detector.detect_age(frame, det[:4])
+                    self.track_ages[track_id] = (age_label, age_range, age_conf)
+                    if track_id in self.track_genders:
+                        gender, gender_conf = self.track_genders[track_id]
+                        current_tracks[track_id] = det + (gender, gender_conf, age_label, age_range, age_conf)
+                    else:
+                        current_tracks[track_id] = det + (age_label, age_range, age_conf)
+
                 self.track_history[track_id].append(det[:4])
                 used_detections.add(best_detection_idx)
                 
@@ -151,6 +166,16 @@ class FaceTracker:
                 else:
                     current_tracks[track_id] = det
 
+                # 检测年龄（如果启用）
+                if self.age_detector is not None and frame is not None:
+                    age_label, age_range, age_conf = self.age_detector.detect_age(frame, det[:4])
+                    self.track_ages[track_id] = (age_label, age_range, age_conf)
+                    if track_id in self.track_genders:
+                        gender, gender_conf = self.track_genders[track_id]
+                        current_tracks[track_id] = det + (gender, gender_conf, age_label, age_range, age_conf)
+                    else:
+                        current_tracks[track_id] = det + (age_label, age_range, age_conf)
+
                 self.track_history[track_id] = [det[:4]]
                 
                 # 生成随机颜色
@@ -169,6 +194,8 @@ class FaceTracker:
                 del self.track_colors[tid]
             if tid in self.track_genders:
                 del self.track_genders[tid]
+            if tid in self.track_ages:
+                del self.track_ages[tid]
         
         return current_tracks
     
@@ -207,19 +234,33 @@ class FaceTracker:
         Returns:
             frame: 绘制了跟踪框和轨迹的图像
         """
+        from age_detector import AgeDetector
+
         for track_id, track_data in tracks.items():
             # 处理不同格式的跟踪数据
-            if len(track_data) == 8:  # 包含性别信息
+            gender = 'Unknown'
+            gender_conf = 0.0
+            age_label = 'Unknown'
+            age_range = (0, 0)
+            age_conf = 0.0
+
+            if len(track_data) == 11:  # 包含性别和年龄信息
+                x1, y1, x2, y2, conf, cls, gender, gender_conf, age_label, age_range, age_conf = track_data
+            elif len(track_data) == 9:  # 包含年龄信息
+                x1, y1, x2, y2, conf, cls, age_label, age_range, age_conf = track_data
+            elif len(track_data) == 8:  # 包含性别信息
                 x1, y1, x2, y2, conf, cls, gender, gender_conf = track_data
-            else:  # 不包含性别信息
+            else:  # 不包含额外信息
                 x1, y1, x2, y2, conf, cls = track_data
-                gender, gender_conf = 'Unknown', 0.0
 
             # 获取跟踪颜色
             color = self.track_colors.get(track_id, (0, 255, 0))
             
+            # 根据年龄调整颜色（优先级高于性别）
+            if age_label != 'Unknown':
+                color = AgeDetector.get_age_color(age_label)
             # 根据性别调整颜色
-            if gender == 'Male':
+            elif gender == 'Male':
                 color = (255, 0, 0)  # 蓝色表示男性
             elif gender == 'Female':
                 color = (0, 0, 255)  # 红色表示女性
@@ -228,10 +269,12 @@ class FaceTracker:
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             
             # 绘制标签
+            label_parts = [f'ID:{track_id}']
+            if age_label != 'Unknown':
+                label_parts.append(f'{age_label}')
             if gender != 'Unknown':
-                label = f'ID:{track_id} {gender} {gender_conf:.2f}'
-            else:
-                label = f'ID:{track_id} {conf:.2f}'
+                label_parts.append(f'{gender}')
+            label = ' '.join(label_parts)
             cv2.putText(frame, label, (x1, y1 - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
             
@@ -249,6 +292,16 @@ class FaceTracker:
                         cv2.line(frame, points[i-1], points[i], color, 2)
         
         return frame
+
+    def enable_age_detection(self):
+        """启用年龄识别"""
+        try:
+            from age_detector import AgeDetector
+            self.age_detector = AgeDetector(model_type='simple')
+            self.enable_age = True
+            print("年龄识别已启用")
+        except Exception as e:
+            print(f"启用年龄识别失败: {e}")
 
 
 def main():

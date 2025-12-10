@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QComboBox,
                              QTextEdit, QGroupBox)
 
+from age_detector import AgeDetector
 from cv_test import HaarFaceDetector
 from login_ui import LoginRegisterDialog
 from yolo_fastestv2_test import YoloFastestV2Detector
@@ -25,7 +26,7 @@ class VideoThread(QThread):
     """视频处理线程"""
     frame_ready = pyqtSignal(np.ndarray, int, float)  # frame, detection_count, fps
     
-    def __init__(self, detector_type='haar', enable_gender=False):
+    def __init__(self, detector_type='haar', enable_gender=False, enable_age=False):
         super().__init__()
         self.detector_type = detector_type
         self.detector = None
@@ -34,6 +35,8 @@ class VideoThread(QThread):
         self.cap = None
         self.enable_gender = enable_gender
         self.gender_detector = None
+        self.enable_age = enable_age
+        self.age_detector = None
         self.init_detector()
     
     def init_detector(self):
@@ -41,17 +44,27 @@ class VideoThread(QThread):
         try:
             if self.detector_type == 'haar':
                 self.detector = HaarFaceDetector(enable_gender=self.enable_gender)
+                if self.enable_age:
+                    self.detector.enable_age_detection()
             elif self.detector_type == 'yolo11':
                 self.detector = YOLO11FaceDetector(enable_gender=self.enable_gender)
+                if self.enable_age:
+                    self.detector.enable_age_detection()
             elif self.detector_type == 'fastestv2':
                 self.detector = YoloFastestV2Detector()
                 if self.enable_gender:
                     self.gender_detector = GenderDetector(model_type='simple')
+                if self.enable_age:
+                    self.age_detector = AgeDetector(model_type='simple')
             elif self.detector_type == 'track':
                 self.tracker = FaceTracker(enable_gender=self.enable_gender)
+                if self.enable_age:
+                    self.tracker.enable_age_detection()
             print(f"检测器初始化成功: {self.detector_type}")
             if self.enable_gender:
                 print("性别识别已启用")
+            if self.enable_age:
+                print("年龄识别已启用")
         except Exception as e:
             print(f"检测器初始化失败: {e}")
     
@@ -173,6 +186,7 @@ class MainWindow(QMainWindow):
         self.video_thread = None
         self.current_user = username
         self.enable_gender = False  # 性别识别开关
+        self.enable_age = False     # 年龄识别开关
         self.init_ui()
     
     def init_ui(self):
@@ -234,6 +248,11 @@ class MainWindow(QMainWindow):
         self.gender_checkbox = QCheckBox('启用性别识别')
         self.gender_checkbox.stateChanged.connect(self.toggle_gender_detection)
         algo_layout.addWidget(self.gender_checkbox)
+
+        # 年龄识别开关
+        self.age_checkbox = QCheckBox('启用年龄识别')
+        self.age_checkbox.stateChanged.connect(self.toggle_age_detection)
+        algo_layout.addWidget(self.age_checkbox)
 
         algo_group.setLayout(algo_layout)
         right_layout.addWidget(algo_group)
@@ -297,6 +316,18 @@ class MainWindow(QMainWindow):
             status = "已启用" if self.enable_gender else "已禁用"
             self.log(f"性别识别{status}（下次检测时生效）")
 
+    def toggle_age_detection(self, state):
+        """切换年龄识别"""
+        from PyQt5.QtCore import Qt
+        self.enable_age = state == Qt.Checked
+        if self.video_thread and self.video_thread.running:
+            self.video_thread.enable_age = self.enable_age
+            status = "已启用" if self.enable_age else "已禁用"
+            self.log(f"年龄识别{status}")
+        else:
+            status = "已启用" if self.enable_age else "已禁用"
+            self.log(f"年龄识别{status}（下次检测时生效）")
+
     def start_detection(self):
         """开始检测"""
         if self.video_thread and self.video_thread.running:
@@ -307,7 +338,7 @@ class MainWindow(QMainWindow):
         algo_name = self.algo_combo.currentText()
         algo_type = algorithm_map[algo_name]
         
-        self.video_thread = VideoThread(algo_type, enable_gender=self.enable_gender)
+        self.video_thread = VideoThread(algo_type, enable_gender=self.enable_gender, enable_age=self.enable_age)
         self.video_thread.frame_ready.connect(self.update_frame)
         self.video_thread.start()
         
@@ -315,9 +346,15 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(True)
         self.algo_combo.setEnabled(False)
         self.gender_checkbox.setEnabled(False)
+        self.age_checkbox.setEnabled(False)
         
-        gender_status = " (性别识别已启用)" if self.enable_gender else ""
-        self.log(f"开始检测，使用算法: {algo_name}{gender_status}")
+        features = []
+        if self.enable_gender:
+            features.append("性别识别")
+        if self.enable_age:
+            features.append("年龄识别")
+        features_status = f" ({', '.join(features)}已启用)" if features else ""
+        self.log(f"开始检测，使用算法: {algo_name}{features_status}")
         self.statusBar().showMessage(f'正在检测 - {algo_name}')
     
     def stop_detection(self):
@@ -331,6 +368,7 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(False)
         self.algo_combo.setEnabled(True)
         self.gender_checkbox.setEnabled(True)
+        self.age_checkbox.setEnabled(True)
         
         self.video_label.clear()
         self.video_label.setText('检测已停止')
