@@ -48,9 +48,14 @@ yoloface/
 ├── setup.py                      # 安装脚本
 ├── pyproject.toml               # 项目元数据
 ├── Makefile                      # Make命令
-├── README.md                     # 项目说明
-├── USAGE.md                      # 使用说明
-└── STRUCTURE.md                  # 本文件
+├── README.md                     # 项目说明（根目录）
+├── doc/                          # 文档目录
+│   ├── USAGE.md                  # 使用说明
+│   ├── STRUCTURE.md              # 本文件
+│   ├── REFACTORING.md            # 重构说明
+│   ├── PROJECT_SUMMARY.md        # 项目总结
+│   ├── FILES.md                  # 文件清单
+│   └── TROUBLESHOOTING.md        # 故障排除
 ```
 
 ## 主要改进

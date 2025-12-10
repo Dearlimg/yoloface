@@ -11,11 +11,11 @@ import cv2
 
 class HaarFaceDetector:
     """Haar级联分类器人脸检测器"""
-    
+
     def __init__(self, cascade_path='haarcascades/haarcascade_frontalface_default.xml', enable_gender=False):
         """
         初始化Haar级联分类器
-        
+
         Args:
             cascade_path: Haar级联分类器文件路径
             enable_gender: 是否启用性别识别
@@ -30,7 +30,7 @@ class HaarFaceDetector:
             self.face_cascade = cv2.CascadeClassifier(
                 cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
             )
-    
+
         # 初始化性别识别器
         self.gender_detector = None
         if enable_gender:
@@ -47,15 +47,15 @@ class HaarFaceDetector:
     def detect(self, frame):
         """
         检测人脸
-        
+
         Args:
             frame: 输入图像帧
-            
+
         Returns:
             faces: 检测到的人脸列表，格式为 [(x, y, w, h), ...]
         """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
+
         # 检测人脸
         faces = self.face_cascade.detectMultiScale(
             gray,
@@ -64,9 +64,9 @@ class HaarFaceDetector:
             minSize=(30, 30),
             flags=cv2.CASCADE_SCALE_IMAGE
         )
-        
+
         return faces
-    
+
     def detect_with_gender(self, frame):
         """
         检测人脸并识别性别
@@ -93,17 +93,17 @@ class HaarFaceDetector:
     def draw_detections(self, frame, faces):
         """
         在图像上绘制检测结果
-        
+
         Args:
             frame: 输入图像帧
             faces: 检测到的人脸列表
-            
+
         Returns:
             frame: 绘制了检测框的图像
         """
         for (x, y, w, h) in faces:
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(frame, 'Face', (x, y - 10), 
+            cv2.putText(frame, 'Face', (x, y - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
         return frame
 

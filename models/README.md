@@ -19,17 +19,17 @@
 
 ### 模型导出
 
-使用 `exporter.py` 工具可以将PyTorch模型导出为其他格式：
+使用 `scripts/exporter.py` 工具可以将PyTorch模型导出为其他格式：
 
 ```bash
 # 导出为ONNX
-python exporter.py --model models/yolo11n.pt --format onnx
+python scripts/exporter.py --model models/yolo11n.pt --format onnx
 
 # 导出为NCNN（用于EAIDK-310）
-python exporter.py --model models/yolo11n.pt --format ncnn
+python scripts/exporter.py --model models/yolo11n.pt --format ncnn
 
 # 导出所有格式
-python exporter.py --model models/yolo11n.pt --format all
+python scripts/exporter.py --model models/yolo11n.pt --format all
 ```
 
 ## 注意事项

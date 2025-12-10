@@ -4,6 +4,8 @@
 
 项目已从简单的脚本集合重构为工程化的Python包结构，遵循Python项目最佳实践。
 
+> **注意**：项目已精简，旧版本的测试文件和 `app_main.py` 已被删除，现在只保留模块化的 `app.py` 作为唯一入口。
+
 ## 主要改进
 
 ### 1. 模块化结构 ✅
@@ -13,7 +15,7 @@
 yoloface/
 ├── cv_test.py
 ├── yolo_test.py
-├── app_main.py
+├── src/yoloface/app.py
 └── ...
 ```
 
@@ -112,8 +114,8 @@ make test
 ### 7. 文档完善 ✅
 
 **新增文档**:
-- `STRUCTURE.md`: 项目结构说明
-- `REFACTORING.md`: 重构说明（本文件）
+- `doc/STRUCTURE.md`: 项目结构说明
+- `doc/REFACTORING.md`: 重构说明（本文件）
 - 更新了 `README.md`
 
 ## 代码改进
@@ -169,7 +171,7 @@ logger.info("初始化检测器...")
 
 **无需更改**: 旧的运行方式仍然可用
 ```bash
-python app_main.py  # 仍然可以工作
+python -m yoloface.app  # 唯一启动方式
 ```
 
 **推荐使用新方式**:
@@ -205,7 +207,7 @@ logger = get_logger(__name__)
 ### 之前
 ```
 yoloface/
-├── app_main.py
+├── src/yoloface/app.py
 ├── cv_test.py
 ├── yolo_test.py
 ├── requirements.txt
