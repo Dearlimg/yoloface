@@ -3,23 +3,25 @@ YOLO11人脸跟踪测试
 使用YOLO11和跟踪算法实现人脸跟踪
 """
 
+import time
+from collections import defaultdict
+
 import cv2
 import numpy as np
-import time
 from ultralytics import YOLO
-from collections import defaultdict
 
 
 class FaceTracker:
     """人脸跟踪器"""
     
-    def __init__(self, model_path='models/yolo11n.pt', conf_threshold=0.25):
+    def __init__(self, model_path='models/yolo11n.pt', conf_threshold=0.25, enable_gender=False):
         """
         初始化跟踪器
         
         Args:
             model_path: YOLO11模型文件路径
             conf_threshold: 置信度阈值
+            enable_gender: 是否启用性别识别
         """
         try:
             print(f"加载YOLO11模型: {model_path}")
@@ -33,8 +35,18 @@ class FaceTracker:
         # 跟踪数据
         self.track_history = defaultdict(list)
         self.track_colors = {}
+        self.track_genders = {}  # 存储每个跟踪ID的性别信息
         self.next_track_id = 0
     
+        # 初始化性别识别器
+        self.gender_detector = None
+        if enable_gender:
+            try:
+                from gender_detector import GenderDetector
+                self.gender_detector = GenderDetector(model_type='simple')
+            except Exception as e:
+                print(f"初始化性别识别器失败: {e}")
+
     def calculate_iou(self, box1, box2):
         """
         计算两个边界框的IoU
@@ -70,15 +82,16 @@ class FaceTracker:
         
         return inter_area / union_area
     
-    def update_tracks(self, detections):
+    def update_tracks(self, detections, frame=None):
         """
         更新跟踪
         
         Args:
             detections: 当前帧的检测结果 [(x1, y1, x2, y2, conf, cls), ...]
+            frame: 输入图像帧（用于性别识别）
             
         Returns:
-            tracks: 跟踪结果 {track_id: (x1, y1, x2, y2, conf, cls), ...}
+            tracks: 跟踪结果 {track_id: (x1, y1, x2, y2, conf, cls, gender, gender_conf), ...}
         """
         current_tracks = {}
         used_detections = set()
@@ -104,7 +117,15 @@ class FaceTracker:
             
             if best_detection_idx >= 0:
                 det = detections[best_detection_idx]
-                current_tracks[track_id] = det
+
+                # 检测性别（如果启用）
+                if self.gender_detector is not None and frame is not None:
+                    gender, gender_conf = self.gender_detector.detect_gender(frame, det[:4])
+                    self.track_genders[track_id] = (gender, gender_conf)
+                    current_tracks[track_id] = det + (gender, gender_conf)
+                else:
+                    current_tracks[track_id] = det
+
                 self.track_history[track_id].append(det[:4])
                 used_detections.add(best_detection_idx)
                 
@@ -121,7 +142,15 @@ class FaceTracker:
             if idx not in used_detections:
                 track_id = self.next_track_id
                 self.next_track_id += 1
-                current_tracks[track_id] = det
+
+                # 检测性别（如果启用）
+                if self.gender_detector is not None and frame is not None:
+                    gender, gender_conf = self.gender_detector.detect_gender(frame, det[:4])
+                    self.track_genders[track_id] = (gender, gender_conf)
+                    current_tracks[track_id] = det + (gender, gender_conf)
+                else:
+                    current_tracks[track_id] = det
+
                 self.track_history[track_id] = [det[:4]]
                 
                 # 生成随机颜色
@@ -138,6 +167,8 @@ class FaceTracker:
             del self.track_history[tid]
             if tid in self.track_colors:
                 del self.track_colors[tid]
+            if tid in self.track_genders:
+                del self.track_genders[tid]
         
         return current_tracks
     
@@ -162,7 +193,7 @@ class FaceTracker:
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                 detections.append((int(x1), int(y1), int(x2), int(y2), conf, cls))
         
-        tracks = self.update_tracks(detections)
+        tracks = self.update_tracks(detections, frame=frame)
         return tracks
     
     def draw_tracks(self, frame, tracks):
@@ -176,15 +207,31 @@ class FaceTracker:
         Returns:
             frame: 绘制了跟踪框和轨迹的图像
         """
-        for track_id, (x1, y1, x2, y2, conf, cls) in tracks.items():
+        for track_id, track_data in tracks.items():
+            # 处理不同格式的跟踪数据
+            if len(track_data) == 8:  # 包含性别信息
+                x1, y1, x2, y2, conf, cls, gender, gender_conf = track_data
+            else:  # 不包含性别信息
+                x1, y1, x2, y2, conf, cls = track_data
+                gender, gender_conf = 'Unknown', 0.0
+
             # 获取跟踪颜色
             color = self.track_colors.get(track_id, (0, 255, 0))
             
+            # 根据性别调整颜色
+            if gender == 'Male':
+                color = (255, 0, 0)  # 蓝色表示男性
+            elif gender == 'Female':
+                color = (0, 0, 255)  # 红色表示女性
+
             # 绘制边界框
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             
             # 绘制标签
-            label = f'ID:{track_id} {conf:.2f}'
+            if gender != 'Unknown':
+                label = f'ID:{track_id} {gender} {gender_conf:.2f}'
+            else:
+                label = f'ID:{track_id} {conf:.2f}'
             cv2.putText(frame, label, (x1, y1 - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
             

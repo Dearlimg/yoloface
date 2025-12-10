@@ -1,24 +1,26 @@
 """
 YOLO11人脸检测测试
 使用Ultralytics YOLO11进行人脸检测
+支持性别识别功能
 """
 
-import cv2
-import numpy as np
 import time
+
+import cv2
 from ultralytics import YOLO
 
 
 class YOLO11FaceDetector:
     """YOLO11人脸检测器"""
     
-    def __init__(self, model_path='models/yolo11n.pt', conf_threshold=0.25):
+    def __init__(self, model_path='models/yolo11n.pt', conf_threshold=0.25, enable_gender=False):
         """
         初始化YOLO11模型
         
         Args:
             model_path: YOLO11模型文件路径
             conf_threshold: 置信度阈值
+            enable_gender: 是否启用性别识别
         """
         try:
             print(f"加载YOLO11模型: {model_path}")
@@ -31,6 +33,15 @@ class YOLO11FaceDetector:
             self.model = YOLO('yolo11n.pt')  # 使用Ultralytics提供的预训练模型
             self.conf_threshold = conf_threshold
     
+        # 初始化性别识别器
+        self.gender_detector = None
+        if enable_gender:
+            try:
+                from gender_detector import GenderDetector
+                self.gender_detector = GenderDetector(model_type='simple')
+            except Exception as e:
+                print(f"初始化性别识别器失败: {e}")
+
     def detect(self, frame):
         """
         检测人脸
@@ -58,6 +69,29 @@ class YOLO11FaceDetector:
         
         return faces
     
+    def detect_with_gender(self, frame):
+        """
+        检测人脸并识别性别
+
+        Args:
+            frame: 输入图像帧
+
+        Returns:
+            detections: 检测结果列表，每个元素为 (x1, y1, x2, y2, conf, cls, gender, gender_conf)
+        """
+        faces = self.detect(frame)
+
+        if self.gender_detector is None:
+            # 如果没有性别识别器，返回原始结果
+            return [(x1, y1, x2, y2, conf, cls, 'Unknown', 0.0) for x1, y1, x2, y2, conf, cls in faces]
+
+        detections = []
+        for x1, y1, x2, y2, conf, cls in faces:
+            gender, gender_conf = self.gender_detector.detect_gender(frame, (x1, y1, x2, y2))
+            detections.append((x1, y1, x2, y2, conf, cls, gender, gender_conf))
+
+        return detections
+
     def draw_detections(self, frame, faces):
         """
         在图像上绘制检测结果
@@ -78,6 +112,42 @@ class YOLO11FaceDetector:
             cv2.putText(frame, label, (x1, y1 - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
         
+        return frame
+
+    def draw_detections_with_gender(self, frame, detections):
+        """
+        在图像上绘制检测结果和性别信息
+
+        Args:
+            frame: 输入图像帧
+            detections: 检测结果列表 (x1, y1, x2, y2, conf, cls, gender, gender_conf)
+
+        Returns:
+            frame: 绘制了检测框和性别信息的图像
+        """
+        for detection in detections:
+            if len(detection) == 8:
+                x1, y1, x2, y2, conf, cls, gender, gender_conf = detection
+            else:
+                x1, y1, x2, y2, conf, cls = detection
+                gender, gender_conf = 'Unknown', 0.0
+
+            # 根据性别选择颜色
+            if gender == 'Male':
+                color = (255, 0, 0)  # 蓝色表示男性
+            elif gender == 'Female':
+                color = (0, 0, 255)  # 红色表示女性
+            else:
+                color = (0, 255, 0)  # 绿色表示未知
+
+            # 绘制边界框
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            # 绘制标签
+            label = f'{gender} {gender_conf:.2f}'
+            cv2.putText(frame, label, (x1, y1 - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
         return frame
 
 

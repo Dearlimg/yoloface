@@ -4,46 +4,54 @@
 """
 
 import sys
-import cv2
-import numpy as np
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QPushButton, QLabel, QComboBox, 
-                             QTextEdit, QGroupBox, QFileDialog, QMessageBox)
-from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QImage, QPixmap
 import time
 
+import cv2
+import numpy as np
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QPushButton, QLabel, QComboBox,
+                             QTextEdit, QGroupBox)
+
 from cv_test import HaarFaceDetector
+from login_ui import LoginRegisterDialog
+from yolo_fastestv2_test import YoloFastestV2Detector
 from yolo_test import YOLO11FaceDetector
 from yolo_track import FaceTracker
-from yolo_fastestv2_test import YoloFastestV2Detector
 
 
 class VideoThread(QThread):
     """视频处理线程"""
     frame_ready = pyqtSignal(np.ndarray, int, float)  # frame, detection_count, fps
     
-    def __init__(self, detector_type='haar'):
+    def __init__(self, detector_type='haar', enable_gender=False):
         super().__init__()
         self.detector_type = detector_type
         self.detector = None
         self.tracker = None
         self.running = False
         self.cap = None
+        self.enable_gender = enable_gender
+        self.gender_detector = None
         self.init_detector()
     
     def init_detector(self):
         """初始化检测器"""
         try:
             if self.detector_type == 'haar':
-                self.detector = HaarFaceDetector()
+                self.detector = HaarFaceDetector(enable_gender=self.enable_gender)
             elif self.detector_type == 'yolo11':
-                self.detector = YOLO11FaceDetector()
+                self.detector = YOLO11FaceDetector(enable_gender=self.enable_gender)
             elif self.detector_type == 'fastestv2':
                 self.detector = YoloFastestV2Detector()
+                if self.enable_gender:
+                    self.gender_detector = GenderDetector(model_type='simple')
             elif self.detector_type == 'track':
-                self.tracker = FaceTracker()
+                self.tracker = FaceTracker(enable_gender=self.enable_gender)
             print(f"检测器初始化成功: {self.detector_type}")
+            if self.enable_gender:
+                print("性别识别已启用")
         except Exception as e:
             print(f"检测器初始化失败: {e}")
     
@@ -89,9 +97,25 @@ class VideoThread(QThread):
                 tracks = self.tracker.detect_and_track(frame)
                 frame = self.tracker.draw_tracks(frame, tracks)
                 detection_count = len(tracks)
-            elif self.detector_type in ['haar', 'yolo11', 'fastestv2']:
+            elif self.detector_type in ['haar', 'yolo11']:
+                if self.enable_gender and hasattr(self.detector, 'detect_with_gender'):
+                    detections = self.detector.detect_with_gender(frame)
+                    frame = self.detector.draw_detections_with_gender(frame, detections)
+                else:
+                    faces = self.detector.detect(frame)
+                    frame = self.detector.draw_detections(frame, faces)
+                detection_count = len(detections) if self.enable_gender else len(faces)
+            elif self.detector_type == 'fastestv2':
                 faces = self.detector.detect(frame)
-                frame = self.detector.draw_detections(frame, faces)
+                if self.enable_gender and self.gender_detector:
+                    # 为 FastestV2 检测结果添加性别识别
+                    detections_with_gender = []
+                    for x1, y1, x2, y2, conf, cls in faces:
+                        gender, gender_conf = self.gender_detector.detect_gender(frame, (x1, y1, x2, y2))
+                        detections_with_gender.append((x1, y1, x2, y2, conf, cls, gender, gender_conf))
+                    frame = self._draw_detections_with_gender(frame, detections_with_gender)
+                else:
+                    frame = self.detector.draw_detections(frame, faces)
                 detection_count = len(faces)
             else:
                 detection_count = 0
@@ -108,6 +132,9 @@ class VideoThread(QThread):
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.putText(frame, f'Detections: {detection_count}', (10, 70),
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            if self.enable_gender:
+                cv2.putText(frame, 'Gender Detection: ON', (10, 110),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
             
             # 发送帧
             self.frame_ready.emit(frame, detection_count, fps)
@@ -116,18 +143,44 @@ class VideoThread(QThread):
         
         self.stop_capture()
 
+    def _draw_detections_with_gender(self, frame, detections):
+        """绘制带性别信息的检测结果"""
+        for x1, y1, x2, y2, conf, cls, gender, gender_conf in detections:
+            # 根据性别选择颜色
+            if gender == 'Male':
+                color = (255, 0, 0)  # 蓝色表示男性
+            elif gender == 'Female':
+                color = (0, 0, 255)  # 红色表示女性
+            else:
+                color = (0, 255, 0)  # 绿色表示未知
+
+            # 绘制边界框
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            # 绘制标签
+            label = f'{gender} {gender_conf:.2f}'
+            cv2.putText(frame, label, (x1, y1 - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+        return frame
+
 
 class MainWindow(QMainWindow):
     """主窗口"""
     
-    def __init__(self):
+    def __init__(self, username=None):
         super().__init__()
         self.video_thread = None
+        self.current_user = username
+        self.enable_gender = False  # 性别识别开关
         self.init_ui()
     
     def init_ui(self):
         """初始化UI"""
-        self.setWindowTitle('基于EAIDK-310的人脸识别系统')
+        title = '基于EAIDK-310的人脸识别系统'
+        if self.current_user:
+            title += f' - 用户: {self.current_user}'
+        self.setWindowTitle(title)
         self.setGeometry(100, 100, 1200, 800)
         
         # 中央部件
@@ -176,6 +229,12 @@ class MainWindow(QMainWindow):
         algo_layout.addWidget(QLabel('算法:'))
         algo_layout.addWidget(self.algo_combo)
         
+        # 性别识别开关
+        from PyQt5.QtWidgets import QCheckBox
+        self.gender_checkbox = QCheckBox('启用性别识别')
+        self.gender_checkbox.stateChanged.connect(self.toggle_gender_detection)
+        algo_layout.addWidget(self.gender_checkbox)
+
         algo_group.setLayout(algo_layout)
         right_layout.addWidget(algo_group)
         
@@ -221,11 +280,23 @@ class MainWindow(QMainWindow):
     
     def change_algorithm(self, index):
         """切换算法"""
-        algorithms = ['haar', 'yolo11', 'track']
+        algorithms = ['haar', 'yolo11', 'fastestv2', 'track']
         if self.video_thread and self.video_thread.running:
             self.video_thread.change_detector(algorithms[index])
             self.log(f"切换到算法: {self.algo_combo.currentText()}")
     
+    def toggle_gender_detection(self, state):
+        """切换性别识别"""
+        from PyQt5.QtCore import Qt
+        self.enable_gender = state == Qt.Checked
+        if self.video_thread and self.video_thread.running:
+            self.video_thread.enable_gender = self.enable_gender
+            status = "已启用" if self.enable_gender else "已禁用"
+            self.log(f"性别识别{status}")
+        else:
+            status = "已启用" if self.enable_gender else "已禁用"
+            self.log(f"性别识别{status}（下次检测时生效）")
+
     def start_detection(self):
         """开始检测"""
         if self.video_thread and self.video_thread.running:
@@ -236,15 +307,17 @@ class MainWindow(QMainWindow):
         algo_name = self.algo_combo.currentText()
         algo_type = algorithm_map[algo_name]
         
-        self.video_thread = VideoThread(algo_type)
+        self.video_thread = VideoThread(algo_type, enable_gender=self.enable_gender)
         self.video_thread.frame_ready.connect(self.update_frame)
         self.video_thread.start()
         
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.algo_combo.setEnabled(False)
+        self.gender_checkbox.setEnabled(False)
         
-        self.log(f"开始检测，使用算法: {algo_name}")
+        gender_status = " (性别识别已启用)" if self.enable_gender else ""
+        self.log(f"开始检测，使用算法: {algo_name}{gender_status}")
         self.statusBar().showMessage(f'正在检测 - {algo_name}')
     
     def stop_detection(self):
@@ -257,6 +330,7 @@ class MainWindow(QMainWindow):
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         self.algo_combo.setEnabled(True)
+        self.gender_checkbox.setEnabled(True)
         
         self.video_label.clear()
         self.video_label.setText('检测已停止')
@@ -297,9 +371,18 @@ class MainWindow(QMainWindow):
 def main():
     """主函数"""
     app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
+
+    # 显示登录注册对话框
+    login_dialog = LoginRegisterDialog()
+    if login_dialog.exec_() == LoginRegisterDialog.Accepted:
+        # 登录成功，显示主窗口
+        username = login_dialog.current_user
+        window = MainWindow(username)
+        window.show()
+        sys.exit(app.exec_())
+    else:
+        # 用户取消登录
+        sys.exit(0)
 
 
 if __name__ == '__main__':

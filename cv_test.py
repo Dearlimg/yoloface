@@ -1,22 +1,24 @@
 """
 OpenCV Haar级联器人脸检测测试
 使用OpenCV的Haar级联分类器进行人脸检测
+支持性别识别功能
 """
 
-import cv2
-import numpy as np
 import time
+
+import cv2
 
 
 class HaarFaceDetector:
     """Haar级联分类器人脸检测器"""
     
-    def __init__(self, cascade_path='haarcascades/haarcascade_frontalface_default.xml'):
+    def __init__(self, cascade_path='haarcascades/haarcascade_frontalface_default.xml', enable_gender=False):
         """
         初始化Haar级联分类器
         
         Args:
             cascade_path: Haar级联分类器文件路径
+            enable_gender: 是否启用性别识别
         """
         try:
             self.face_cascade = cv2.CascadeClassifier(cascade_path)
@@ -29,6 +31,15 @@ class HaarFaceDetector:
                 cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
             )
     
+        # 初始化性别识别器
+        self.gender_detector = None
+        if enable_gender:
+            try:
+                from gender_detector import GenderDetector
+                self.gender_detector = GenderDetector(model_type='simple')
+            except Exception as e:
+                print(f"初始化性别识别器失败: {e}")
+
     def detect(self, frame):
         """
         检测人脸
@@ -52,6 +63,29 @@ class HaarFaceDetector:
         
         return faces
     
+    def detect_with_gender(self, frame):
+        """
+        检测人脸并识别性别
+
+        Args:
+            frame: 输入图像帧
+
+        Returns:
+            detections: 检测结果列表，每个元素为 (x, y, w, h, gender, gender_conf)
+        """
+        faces = self.detect(frame)
+
+        if self.gender_detector is None:
+            # 如果没有性别识别器，返回原始结果
+            return [(x, y, w, h, 'Unknown', 0.0) for x, y, w, h in faces]
+
+        detections = []
+        for x, y, w, h in faces:
+            gender, conf = self.gender_detector.detect_gender(frame, (x, y, x + w, y + h))
+            detections.append((x, y, w, h, gender, conf))
+
+        return detections
+
     def draw_detections(self, frame, faces):
         """
         在图像上绘制检测结果
@@ -67,6 +101,42 @@ class HaarFaceDetector:
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv2.putText(frame, 'Face', (x, y - 10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        return frame
+
+    def draw_detections_with_gender(self, frame, detections):
+        """
+        在图像上绘制检测结果和性别信息
+
+        Args:
+            frame: 输入图像帧
+            detections: 检测结果列表 (x, y, w, h, gender, gender_conf)
+
+        Returns:
+            frame: 绘制了检测框和性别信息的图像
+        """
+        for detection in detections:
+            if len(detection) == 6:
+                x, y, w, h, gender, gender_conf = detection
+            else:
+                x, y, w, h = detection
+                gender, gender_conf = 'Unknown', 0.0
+
+            # 根据性别选择颜色
+            if gender == 'Male':
+                color = (255, 0, 0)  # 蓝色表示男性
+            elif gender == 'Female':
+                color = (0, 0, 255)  # 红色表示女性
+            else:
+                color = (0, 255, 0)  # 绿色表示未知
+
+            # 绘制边界框
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+
+            # 绘制标签
+            label = f'{gender} {gender_conf:.2f}'
+            cv2.putText(frame, label, (x, y - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
         return frame
 
 
