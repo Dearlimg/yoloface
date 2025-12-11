@@ -7,6 +7,10 @@ torch>=2.0.0
 torchvision>=0.15.0
 Pillow>=9.0.0
 PyYAML>=6.0
+# 数据库支持（可选，如果不需要登录功能可以不安装）
+mysql-connector-python>=8.0.0
+# 或使用 PyMySQL
+# PyMySQL>=1.0.0
 mysql-connector-python>=8.0.0
 PyMySQL>=1.0.0
 

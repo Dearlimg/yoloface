@@ -72,3 +72,15 @@ performance:
   enable_multiprocess: false
   num_processes: 2
 
+# 应用配置
+app:
+  require_login: true  # 是否要求登录
+
+# 数据库配置
+database:
+  host: "113.44.144.219"
+  port: 3306
+  user: "root"
+  password: "123456"
+  database: "xupt_sta"
+

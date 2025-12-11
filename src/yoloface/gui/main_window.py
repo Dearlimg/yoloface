@@ -98,11 +98,13 @@ class VideoThread(QThread):
             # 检测
             if self.detector_type == 'track':
                 tracks = self.tracker.detect_and_track(frame)
-                frame = self.tracker.draw_tracks(frame, tracks)
+                # 性别识别已自动集成在draw_tracks中
+                frame = self.tracker.draw_tracks(frame, tracks, show_gender=True)
                 detection_count = len(tracks)
             elif self.detector_type in ['haar', 'yolo11', 'fastestv2']:
                 faces = self.detector.detect(frame)
-                frame = self.detector.draw_detections(frame, faces)
+                # 性别识别已自动集成在draw_detections中
+                frame = self.detector.draw_detections(frame, faces, show_gender=True)
                 detection_count = len(faces)
             else:
                 detection_count = 0
@@ -133,16 +135,20 @@ class VideoThread(QThread):
 class MainWindow(QMainWindow):
     """主窗口"""
     
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, username: Optional[str] = None):
         super().__init__()
         self.config = config
+        self.username = username
         self.video_thread: Optional[VideoThread] = None
         self.init_ui()
     
     def init_ui(self):
         """初始化UI"""
         gui_config = self.config.get('gui', {})
-        self.setWindowTitle(gui_config.get('window_title', '基于EAIDK-310的人脸识别系统'))
+        title = gui_config.get('window_title', '基于EAIDK-310的人脸识别系统')
+        if self.username:
+            title += f' - 用户: {self.username}'
+        self.setWindowTitle(title)
         self.setGeometry(100, 100,
                         gui_config.get('window_width', 1200),
                         gui_config.get('window_height', 800))
