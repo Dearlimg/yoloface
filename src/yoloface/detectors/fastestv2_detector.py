@@ -13,6 +13,21 @@ from ..config import get_config
 
 logger = get_logger(__name__)
 
+# 延迟导入性别分类器
+_gender_classifier = None
+
+def _get_gender_classifier():
+    """获取性别分类器实例（单例）"""
+    global _gender_classifier
+    if _gender_classifier is None:
+        try:
+            from .gender_classifier import GenderClassifier
+            _gender_classifier = GenderClassifier()
+        except Exception as e:
+            logger.warning(f"无法加载性别分类器: {e}")
+            _gender_classifier = None
+    return _gender_classifier
+
 
 class YoloFastestV2Detector:
     """Yolo-FastestV2检测器"""
@@ -113,7 +128,8 @@ class YoloFastestV2Detector:
         frame: np.ndarray,
         faces: List[Tuple[int, int, int, int, float, int]],
         color: Tuple[int, int, int] = (0, 255, 0),
-        thickness: int = 2
+        thickness: int = 2,
+        show_gender: bool = True
     ) -> np.ndarray:
         """
         在图像上绘制检测结果
@@ -123,13 +139,37 @@ class YoloFastestV2Detector:
             faces: 检测到的人脸列表
             color: 绘制颜色
             thickness: 线条粗细
+            show_gender: 是否显示性别
             
         Returns:
             frame: 绘制了检测框的图像
         """
+        gender_classifier = _get_gender_classifier() if show_gender else None
+        
         for (x1, y1, x2, y2, conf, cls) in faces:
+            # 绘制边界框
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
+            
+            # 性别识别
             label = f'Face {conf:.2f}'
+            if gender_classifier:
+                try:
+                    # 提取人脸区域（确保坐标有效）
+                    x1_safe = max(0, x1)
+                    y1_safe = max(0, y1)
+                    x2_safe = min(frame.shape[1], x2)
+                    y2_safe = min(frame.shape[0], y2)
+                    
+                    if x2_safe > x1_safe and y2_safe > y1_safe:
+                        face_roi = frame[y1_safe:y2_safe, x1_safe:x2_safe]
+                        if face_roi.size > 0 and face_roi.shape[0] > 10 and face_roi.shape[1] > 10:
+                            gender, gender_conf = gender_classifier.predict(face_roi)
+                            if gender.value != "未知":
+                                label = f'{gender.value} {gender_conf:.2f}'
+                except Exception as e:
+                    logger.debug(f"性别识别失败: {e}")
+            
+            # 绘制标签
             cv2.putText(frame, label, (x1, y1 - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, thickness)
         return frame

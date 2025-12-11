@@ -9,6 +9,7 @@
 
 - ✅ 实时摄像头人脸检测
 - ✅ 多种检测算法切换（Haar、YOLO11、Yolo-FastestV2）
+- ✅ **性别识别功能**（男/女识别，支持预训练模型）
 - ✅ 人脸跟踪功能
 - ✅ 检测结果可视化
 - ✅ 性能统计和误差分析
@@ -54,11 +55,26 @@ yoloface/
 
 ## 文档
 
-详细文档请查看 `doc/` 目录：
+详细文档请查看 `doc/` 目录，完整索引见 [文档索引](doc/INDEX.md)：
 
+### 快速开始
+- [快速开始](doc/QUICK_START.md) - 快速上手指南
+- [安装说明](doc/SETUP_INSTRUCTIONS.md) - 详细安装步骤
 - [使用说明](doc/USAGE.md) - 详细的使用指南
-- [项目结构](doc/STRUCTURE.md) - 项目结构说明
+
+### 功能文档
+- [性别识别](doc/GENDER_RECOGNITION.md) - 性别识别功能说明
+- [准确率提升](doc/GENDER_ACCURACY_IMPROVEMENT.md) - 如何提高性别识别准确率
+- [GUI环境配置](doc/GUI_SETUP.md) - 开发板GUI环境配置
+- [设备兼容性](doc/DEVICE_COMPATIBILITY.md) - 开发板问题排查
+
+### 架构文档
 - [系统架构](doc/ARCHITECTURE.md) - 系统架构图
+- [项目结构](doc/STRUCTURE.md) - 项目结构说明
+- [流程图](doc/FLOWCHART.md) - 系统流程图
+
+### 更多文档
+- [文档索引](doc/INDEX.md) - 完整文档索引
 - [项目总结](doc/PROJECT_SUMMARY.md) - 项目完成情况
 
 ## 开发说明

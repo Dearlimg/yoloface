@@ -22,40 +22,67 @@ wheels/
 
 # Virtual Environment
 venv/
-env/
 ENV/
+env/
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
 
-# Models
-*.pt
-*.onnx
-*.param
-*.bin
-*.engine
-models/*.pt
-models/*.onnx
-yolo_fastestv2/*.onnx
-yolo_fastestv2/*.param
-yolo_fastestv2/*.bin
+# Logs
+*.log
+logs/
+*.log.*
 
-# Data
-*.mp4
-*.avi
+# Data files
+*.db
+*.sqlite
+*.sqlite3
+
+# Model files (large)
+*.caffemodel
+*.onnx
+*.pt
+*.pth
+*.h5
+*.pb
+models/*.caffemodel
+models/*.onnx
+models/*.pt
+models/*.pth
+
+# Output files
+output/
+data/output/
 *.jpg
 *.png
-*.jpeg
-*.mov
+*.mp4
+*.avi
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Logs
-*.log
+# Temporary files
+*.tmp
+*.bak
+*.swp
+temp/
+tmp/
 
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Project specific
+src/yoloface.egg-info/
+packages/

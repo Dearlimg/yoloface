@@ -19,6 +19,21 @@ from ..config import get_config
 
 logger = get_logger(__name__)
 
+# 延迟导入性别分类器
+_gender_classifier = None
+
+def _get_gender_classifier():
+    """获取性别分类器实例（单例）"""
+    global _gender_classifier
+    if _gender_classifier is None:
+        try:
+            from .gender_classifier import GenderClassifier
+            _gender_classifier = GenderClassifier()
+        except Exception as e:
+            logger.warning(f"无法加载性别分类器: {e}")
+            _gender_classifier = None
+    return _gender_classifier
+
 
 class FaceTracker:
     """人脸跟踪器"""
@@ -198,7 +213,8 @@ class FaceTracker:
         self,
         frame: np.ndarray,
         tracks: Dict[int, Tuple[int, int, int, int, float, int]],
-        show_trail: bool = True
+        show_trail: bool = True,
+        show_gender: bool = True
     ) -> np.ndarray:
         """
         绘制跟踪结果
@@ -207,10 +223,13 @@ class FaceTracker:
             frame: 输入图像帧
             tracks: 跟踪结果
             show_trail: 是否显示轨迹
+            show_gender: 是否显示性别
             
         Returns:
             frame: 绘制了跟踪框和轨迹的图像
         """
+        gender_classifier = _get_gender_classifier() if show_gender else None
+        
         for track_id, (x1, y1, x2, y2, conf, cls) in tracks.items():
             # 获取跟踪颜色
             color = self.track_colors.get(track_id, (0, 255, 0))
@@ -218,8 +237,26 @@ class FaceTracker:
             # 绘制边界框
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             
-            # 绘制标签
+            # 性别识别
             label = f'ID:{track_id} {conf:.2f}'
+            if gender_classifier:
+                try:
+                    # 提取人脸区域（确保坐标有效）
+                    x1_safe = max(0, x1)
+                    y1_safe = max(0, y1)
+                    x2_safe = min(frame.shape[1], x2)
+                    y2_safe = min(frame.shape[0], y2)
+                    
+                    if x2_safe > x1_safe and y2_safe > y1_safe:
+                        face_roi = frame[y1_safe:y2_safe, x1_safe:x2_safe]
+                        if face_roi.size > 0 and face_roi.shape[0] > 10 and face_roi.shape[1] > 10:
+                            gender, gender_conf = gender_classifier.predict(face_roi)
+                            if gender.value != "未知":
+                                label = f'ID:{track_id} {gender.value} {gender_conf:.2f}'
+                except Exception as e:
+                    logger.debug(f"性别识别失败: {e}")
+            
+            # 绘制标签
             cv2.putText(frame, label, (x1, y1 - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
             

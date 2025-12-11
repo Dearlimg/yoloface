@@ -18,6 +18,34 @@ from ..config import get_config
 
 logger = get_logger(__name__)
 
+# 导入文本绘制工具
+try:
+    from ..utils.text_utils import put_chinese_text
+    USE_CHINESE_TEXT = True
+except ImportError:
+    USE_CHINESE_TEXT = False
+
+# 导入Gender枚举用于检查
+try:
+    from .gender_classifier import Gender
+except ImportError:
+    Gender = None
+
+# 延迟导入性别分类器
+_gender_classifier = None
+
+def _get_gender_classifier():
+    """获取性别分类器实例（单例）"""
+    global _gender_classifier
+    if _gender_classifier is None:
+        try:
+            from .gender_classifier import GenderClassifier
+            _gender_classifier = GenderClassifier()
+        except Exception as e:
+            logger.warning(f"无法加载性别分类器: {e}")
+            _gender_classifier = None
+    return _gender_classifier
+
 
 class YOLO11FaceDetector:
     """YOLO11人脸检测器"""
@@ -91,7 +119,8 @@ class YOLO11FaceDetector:
         frame: np.ndarray,
         faces: List[Tuple[int, int, int, int, float, int]],
         color: Tuple[int, int, int] = (0, 255, 0),
-        thickness: int = 2
+        thickness: int = 2,
+        show_gender: bool = True
     ) -> np.ndarray:
         """
         在图像上绘制检测结果
@@ -101,18 +130,57 @@ class YOLO11FaceDetector:
             faces: 检测到的人脸列表
             color: 绘制颜色
             thickness: 线条粗细
+            show_gender: 是否显示性别
             
         Returns:
             frame: 绘制了检测框的图像
         """
+        gender_classifier = _get_gender_classifier() if show_gender else None
+        
         for (x1, y1, x2, y2, conf, cls) in faces:
             # 绘制边界框
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
             
-            # 绘制标签和置信度
+            # 性别识别
             label = f'Person {conf:.2f}'
-            cv2.putText(frame, label, (x1, y1 - 10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, thickness)
+            if gender_classifier:
+                try:
+                    # 提取人体区域（确保坐标有效）
+                    x1_safe = max(0, x1)
+                    y1_safe = max(0, y1)
+                    x2_safe = min(frame.shape[1], x2)
+                    y2_safe = min(frame.shape[0], y2)
+                    
+                    if x2_safe > x1_safe and y2_safe > y1_safe:
+                        person_roi = frame[y1_safe:y2_safe, x1_safe:x2_safe]
+                        if person_roi.size > 0 and person_roi.shape[0] > 30 and person_roi.shape[1] > 30:
+                            # YOLO11检测的是整个人体，需要提取人脸区域
+                            # 人脸通常在人体区域的上1/3部分
+                            face_region_height = int(person_roi.shape[0] * 0.4)  # 上40%区域
+                            face_roi = person_roi[0:face_region_height, :]
+                            
+                            # 如果提取的区域太小，使用整个人体区域的上半部分
+                            if face_roi.shape[0] < 30 or face_roi.shape[1] < 30:
+                                face_roi = person_roi[0:int(person_roi.shape[0] * 0.5), :]
+                            
+                            if face_roi.size > 0 and face_roi.shape[0] > 20 and face_roi.shape[1] > 20:
+                                gender, gender_conf = gender_classifier.predict(face_roi)
+                                # 确保不返回UNKNOWN
+                                if gender.value != "未知" and gender != Gender.UNKNOWN:
+                                    label = f'{gender.value} {gender_conf:.2f}'
+                                else:
+                                    # 如果返回未知，使用默认标签
+                                    label = f'Person {conf:.2f}'
+                except Exception as e:
+                    logger.debug(f"性别识别失败: {e}")
+            
+            # 绘制标签（支持中文）
+            if USE_CHINESE_TEXT:
+                frame = put_chinese_text(frame, label, (x1, y1 - 10), 
+                                        font_scale=0.6, color=color, thickness=thickness)
+            else:
+                cv2.putText(frame, label, (x1, y1 - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, thickness)
         
         return frame
 

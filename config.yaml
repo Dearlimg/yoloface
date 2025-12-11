@@ -34,6 +34,15 @@ detection:
     iou_threshold: 0.3
     max_history: 30
     track_lost_threshold: 5
+  
+  # 性别识别配置
+  gender:
+    enabled: true              # 是否启用性别识别
+    model_path: null           # 性别分类模型路径（.caffemodel或.onnx），null表示使用简单分类
+    prototxt_path: null       # Caffe模型的prototxt文件路径（仅Caffe模型需要）
+    input_size: [227, 227]    # 模型输入尺寸
+    mean_values: [104, 117, 123]  # 图像均值（用于预处理）
+    scale: 1.0                # 图像缩放因子
 
 # GUI配置
 gui:

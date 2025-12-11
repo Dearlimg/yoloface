@@ -12,6 +12,28 @@ from ..config import get_config
 
 logger = get_logger(__name__)
 
+# 导入文本绘制工具
+try:
+    from ..utils.text_utils import put_chinese_text
+    USE_CHINESE_TEXT = True
+except ImportError:
+    USE_CHINESE_TEXT = False
+
+# 延迟导入性别分类器，避免循环依赖
+_gender_classifier = None
+
+def _get_gender_classifier():
+    """获取性别分类器实例（单例）"""
+    global _gender_classifier
+    if _gender_classifier is None:
+        try:
+            from .gender_classifier import GenderClassifier
+            _gender_classifier = GenderClassifier()
+        except Exception as e:
+            logger.warning(f"无法加载性别分类器: {e}")
+            _gender_classifier = None
+    return _gender_classifier
+
 
 class HaarFaceDetector:
     """Haar级联分类器人脸检测器"""
@@ -101,7 +123,8 @@ class HaarFaceDetector:
         frame: np.ndarray,
         faces: List[Tuple[int, int, int, int]],
         color: Tuple[int, int, int] = (0, 255, 0),
-        thickness: int = 2
+        thickness: int = 2,
+        show_gender: bool = True
     ) -> np.ndarray:
         """
         在图像上绘制检测结果
@@ -111,13 +134,51 @@ class HaarFaceDetector:
             faces: 检测到的人脸列表
             color: 绘制颜色
             thickness: 线条粗细
+            show_gender: 是否显示性别
             
         Returns:
             frame: 绘制了检测框的图像
         """
+        gender_classifier = _get_gender_classifier() if show_gender else None
+        
         for (x, y, w, h) in faces:
+            # 绘制边界框
             cv2.rectangle(frame, (x, y), (x + w, y + h), color, thickness)
-            cv2.putText(frame, 'Face', (x, y - 10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, thickness)
+            
+            # 性别识别
+            label = 'Face'
+            if gender_classifier:
+                try:
+                    # 提取人脸区域（确保坐标有效）
+                    x1 = max(0, x)
+                    y1 = max(0, y)
+                    x2 = min(frame.shape[1], x + w)
+                    y2 = min(frame.shape[0], y + h)
+                    
+                    if x2 > x1 and y2 > y1:
+                        face_roi = frame[y1:y2, x1:x2]
+                        if face_roi.size > 0 and face_roi.shape[0] > 10 and face_roi.shape[1] > 10:
+                            gender, conf = gender_classifier.predict(face_roi)
+                            # 确保不返回UNKNOWN，如果返回了也使用默认标签
+                            if gender and hasattr(gender, 'value') and gender.value not in ["未知", "UNKNOWN"]:
+                                label = f'{gender.value} {conf:.2f}'
+                            else:
+                                # 如果返回未知，使用默认标签
+                                label = 'Face'
+                        else:
+                            label = 'Face'
+                    else:
+                        label = 'Face'
+                except Exception as e:
+                    logger.debug(f"性别识别失败: {e}")
+                    label = 'Face'
+            
+            # 绘制标签（支持中文）
+            if USE_CHINESE_TEXT:
+                frame = put_chinese_text(frame, label, (x, y - 10), 
+                                        font_scale=0.7, color=color, thickness=thickness)
+            else:
+                cv2.putText(frame, label, (x, y - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, thickness)
         return frame
 

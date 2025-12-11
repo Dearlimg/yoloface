@@ -1,72 +1,74 @@
-# 脚本目录
+# 脚本目录说明
 
-本目录包含项目的所有工具脚本。
+本目录包含项目的所有脚本和工具。
 
-## 脚本列表
+## 🔧 主要脚本
 
-### 1. `exporter.py` - 模型导出工具
-将PyTorch模型导出为ONNX、NCNN、TensorRT等格式，用于EAIDK-310部署。
+### 环境检查
+- **check_imports.py** - 检查所有模块导入是否正常
+- **diagnose.py** - 开发板环境诊断脚本
 
-**使用方法**：
+### 模型和资源
+- **download_gender_model.py** - 下载性别分类模型
+- **download_haarcascades.py** - 下载Haar级联分类器文件
+
+### 测试脚本
+- **test_gender.py** - 测试性别识别功能
+- **run_tests.py** - 运行测试套件
+
+### 工具脚本
+- **exporter.py** - 模型导出工具（ONNX、NCNN等）
+- **legacy_compat.py** - 向后兼容脚本
+- **install.sh** - 安装脚本（Linux/Mac）
+
+## 📝 历史脚本（已废弃）
+
+以下脚本保留用于参考，但不再维护：
+
+- **1.py, 2.py** - 临时测试脚本
+- **age_detector.py** - 年龄检测器（旧版本）
+- **app_main.py** - 旧版应用入口
+- **cv_test.py** - OpenCV测试脚本
+- **db_manager.py** - 数据库管理（如果使用）
+- **debug_gender_features.py** - 性别特征调试
+- **demo_workflow.py** - 演示工作流
+- **gender_detector.py** - 性别检测器（旧版本）
+- **login_ui.py** - 登录UI（如果使用）
+- **test_age_and_gender.py** - 年龄和性别测试
+- **test_age_detection.py** - 年龄检测测试
+- **test_age_display.py** - 年龄显示测试
+- **test_db_connection.py** - 数据库连接测试
+- **test_gender_detection.py** - 性别检测测试
+- **yolo_test.py** - YOLO测试脚本
+- **yolo_track.py** - YOLO跟踪脚本
+
+## 🚀 使用说明
+
+### 检查环境
 ```bash
-# 导出为ONNX
-python scripts/exporter.py --model models/yolo11n.pt --format onnx
-
-# 导出为NCNN（用于EAIDK-310）
-python scripts/exporter.py --model models/yolo11n.pt --format ncnn
-
-# 导出为TensorRT
-python scripts/exporter.py --model models/yolo11n.pt --format tensorrt
-
-# 导出所有格式
-python scripts/exporter.py --model models/yolo11n.pt --format all
+python3 scripts/check_imports.py
+python3 scripts/diagnose.py
 ```
 
-### 2. `check_imports.py` - 依赖检查脚本
-检查所有模块导入是否正常，用于验证项目依赖是否正确安装。
-
-**使用方法**：
+### 下载模型
 ```bash
-python scripts/check_imports.py
+python3 scripts/download_gender_model.py
+python3 scripts/download_haarcascades.py
 ```
 
-### 3. `download_haarcascades.py` - Haar级联分类器下载工具
-下载OpenCV Haar级联分类器文件到本地。
-
-**使用方法**：
+### 运行测试
 ```bash
-python scripts/download_haarcascades.py
+python3 scripts/test_gender.py
+python3 scripts/run_tests.py
 ```
 
-**注意**：程序会自动使用OpenCV内置的级联分类器，所以这一步是可选的。本地文件可以提高加载速度。
-
-### 4. `install.sh` - 安装脚本
-自动化安装项目依赖和设置环境。
-
-**使用方法**：
-```bash
-./scripts/install.sh
-```
-
-或在Windows上：
+### 安装依赖
 ```bash
 bash scripts/install.sh
 ```
 
-### 5. `run_tests.py` - 测试运行脚本
-运行项目的单元测试。
+## 📌 注意事项
 
-**使用方法**：
-```bash
-python scripts/run_tests.py
-```
-
-### 6. `legacy_compat.py` - 兼容性脚本
-用于向后兼容的脚本（如果存在）。
-
-## 注意事项
-
-- 所有脚本都假设在项目根目录下运行
-- 某些脚本可能需要特定的依赖（如exporter.py需要PyTorch和Ultralytics）
-- 脚本路径使用相对路径，确保在项目根目录执行
-
+1. 主要功能代码在 `src/yoloface/` 目录
+2. 历史脚本仅供参考，不建议直接使用
+3. 新功能请添加到 `src/yoloface/` 中，而不是创建新脚本
