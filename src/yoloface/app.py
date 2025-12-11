@@ -67,6 +67,7 @@ def main():
             
             logger.info("创建登录对话框...")
             # 创建登录注册对话框（不立即初始化数据库）
+            login_dialog = None
             try:
                 login_dialog = LoginRegisterDialog()
                 logger.info("登录对话框创建成功")
@@ -74,32 +75,49 @@ def main():
                 logger.error(f"创建登录对话框失败: {e}")
                 import traceback
                 logger.error(traceback.format_exc())
-                raise
-            
-            logger.info("显示登录对话框...")
-            # 显示对话框（阻塞直到关闭）
-            try:
-                result = login_dialog.exec_()
-                logger.info(f"登录对话框返回: {result}")
-            except Exception as e:
-                logger.error(f"显示登录对话框失败: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
-                # 如果对话框显示失败，询问是否继续
+                # 如果创建失败，询问是否继续
                 try:
                     from PyQt5.QtWidgets import QMessageBox
                     reply = QMessageBox.question(
                         None,
                         "对话框错误",
-                        f"登录对话框显示失败: {e}\n\n是否跳过登录继续运行？",
+                        f"登录对话框创建失败: {e}\n\n是否跳过登录继续运行？",
                         QMessageBox.Yes | QMessageBox.No
                     )
                     if reply == QMessageBox.No:
                         sys.exit(1)
-                    result = QDialog.Rejected
+                    # 跳过登录
+                    login_dialog = None
                 except:
                     logger.warning("无法显示错误对话框，跳过登录继续运行")
-                    result = QDialog.Rejected
+                    login_dialog = None
+            
+            result = QDialog.Rejected
+            if login_dialog:
+                logger.info("显示登录对话框...")
+                # 显示对话框（阻塞直到关闭）
+                try:
+                    result = login_dialog.exec_()
+                    logger.info(f"登录对话框返回: {result}")
+                except Exception as e:
+                    logger.error(f"显示登录对话框失败: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    # 如果对话框显示失败，询问是否继续
+                    try:
+                        from PyQt5.QtWidgets import QMessageBox
+                        reply = QMessageBox.question(
+                            None,
+                            "对话框错误",
+                            f"登录对话框显示失败: {e}\n\n是否跳过登录继续运行？",
+                            QMessageBox.Yes | QMessageBox.No
+                        )
+                        if reply == QMessageBox.No:
+                            sys.exit(1)
+                        result = QDialog.Rejected
+                    except:
+                        logger.warning("无法显示错误对话框，跳过登录继续运行")
+                        result = QDialog.Rejected
             
             if result == QDialog.Accepted:
                 # 登录成功

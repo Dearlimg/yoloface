@@ -22,51 +22,45 @@ class LoginRegisterDialog(QDialog):
         super().__init__(parent)
         self.current_user = None
         self.db_manager = None
+        self._db_initialized = False
         
-        # 只初始化UI，完全延迟数据库初始化到对话框显示后
+        # 只初始化UI，不自动初始化数据库（避免崩溃）
         self.init_ui()
         
-        # 使用QTimer延迟初始化数据库管理器（避免在对话框创建时崩溃）
-        from PyQt5.QtCore import QTimer
-        
-        def init_db_manager():
-            try:
-                logger.info("初始化数据库管理器...")
-                self.db_manager = DatabaseManager()
-                logger.info("数据库管理器创建成功")
-                # 然后连接数据库
-                self.init_database()
-            except Exception as e:
-                logger.error(f"初始化数据库管理器失败: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
-        
-        # 延迟1秒初始化数据库，确保对话框已经完全显示
-        QTimer.singleShot(1000, init_db_manager)
+        # 不在初始化时自动连接数据库，只在用户操作时按需初始化
 
-    def init_database(self):
-        """初始化数据库（延迟连接，避免阻塞UI初始化）"""
-        if not self.db_manager:
-            logger.warning("数据库管理器未初始化")
-            return
+    def ensure_db_initialized(self):
+        """确保数据存储已初始化（文件存储版本，更简单）"""
+        if self._db_initialized:
+            return True
         
-        # 使用QTimer延迟连接，避免在对话框初始化时阻塞或崩溃
-        from PyQt5.QtCore import QTimer
-        
-        def connect_db():
-            try:
-                if self.db_manager and self.db_manager.connect():
-                    self.db_manager.create_user_table()
-                    logger.info("数据库初始化成功")
-                else:
-                    logger.warning("数据库连接失败，但允许继续运行（如果数据库不可用）")
-            except Exception as e:
-                logger.error(f"数据库初始化失败: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
-        
-        # 延迟500ms连接数据库，确保UI已经显示
-        QTimer.singleShot(500, connect_db)
+        try:
+            if not self.db_manager:
+                logger.info("初始化数据管理器...")
+                self.db_manager = DatabaseManager()
+                logger.info("数据管理器创建成功")
+            
+            # 文件存储版本，连接总是成功
+            if self.db_manager:
+                try:
+                    if self.db_manager.connect():
+                        self.db_manager.create_user_table()
+                        logger.info("数据存储初始化成功")
+                        self._db_initialized = True
+                        return True
+                    else:
+                        logger.warning("数据存储初始化失败")
+                        return False
+                except Exception as e:
+                    logger.error(f"数据存储初始化异常: {type(e).__name__}: {e}")
+                    return False
+            else:
+                return False
+        except Exception as e:
+            logger.error(f"数据存储初始化失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return False
 
     def init_ui(self):
         """初始化UI"""
@@ -279,24 +273,10 @@ class LoginRegisterDialog(QDialog):
             QMessageBox.warning(self, "警告", "用户名和密码不能为空")
             return
 
-        # 如果数据库管理器还未初始化，尝试立即初始化
-        if not self.db_manager:
-            try:
-                logger.info("延迟初始化数据库管理器...")
-                self.db_manager = DatabaseManager()
-                if self.db_manager:
-                    self.db_manager.connect()
-                    self.db_manager.create_user_table()
-            except Exception as e:
-                logger.error(f"数据库管理器初始化失败: {e}")
-                QMessageBox.warning(self, "错误", f"数据库管理器未初始化，无法登录\n错误: {e}")
-                return
-
-        if not self.db_manager.connection:
-            # 尝试连接
-            if not self.db_manager.connect():
-                QMessageBox.warning(self, "警告", "数据库未连接，无法登录\n请检查网络连接和数据库配置")
-                return
+        # 按需初始化数据库
+        if not self.ensure_db_initialized():
+            QMessageBox.warning(self, "警告", "数据存储未初始化，无法登录")
+            return
 
         try:
             success, message = self.db_manager.login_user(username, password)
@@ -328,24 +308,10 @@ class LoginRegisterDialog(QDialog):
             QMessageBox.warning(self, "警告", "两次输入的密码不一致")
             return
 
-        # 如果数据库管理器还未初始化，尝试立即初始化
-        if not self.db_manager:
-            try:
-                logger.info("延迟初始化数据库管理器...")
-                self.db_manager = DatabaseManager()
-                if self.db_manager:
-                    self.db_manager.connect()
-                    self.db_manager.create_user_table()
-            except Exception as e:
-                logger.error(f"数据库管理器初始化失败: {e}")
-                QMessageBox.warning(self, "错误", f"数据库管理器未初始化，无法注册\n错误: {e}")
-                return
-
-        if not self.db_manager.connection:
-            # 尝试连接
-            if not self.db_manager.connect():
-                QMessageBox.warning(self, "警告", "数据库未连接，无法注册\n请检查网络连接和数据库配置")
-                return
+        # 按需初始化数据库
+        if not self.ensure_db_initialized():
+            QMessageBox.warning(self, "警告", "数据存储未初始化，无法注册")
+            return
 
         try:
             success, message = self.db_manager.register_user(username, password)
@@ -365,9 +331,9 @@ class LoginRegisterDialog(QDialog):
     def closeEvent(self, event):
         """关闭事件"""
         try:
-            if self.db_manager and self.db_manager.connection:
+            if self.db_manager:
                 self.db_manager.disconnect()
         except Exception as e:
-            logger.error(f"关闭数据库连接失败: {e}")
+            logger.error(f"关闭数据存储失败: {e}")
         event.accept()
 

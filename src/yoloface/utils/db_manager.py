@@ -1,9 +1,12 @@
 """
-数据库管理模块
-处理MySQL数据库连接和用户认证
+数据库管理模块（文件存储版本）
+使用本地JSON文件存储用户数据
 """
 
 import hashlib
+import json
+import os
+from pathlib import Path
 from typing import Tuple, Optional
 
 from ..utils.logger import get_logger
@@ -11,131 +14,141 @@ from ..config import get_config
 
 logger = get_logger(__name__)
 
-# 安全地导入MySQL驱动，避免崩溃
-MYSQL_CONNECTOR_AVAILABLE = False
-mysql = None
-Error = Exception
-
-try:
-    import mysql.connector
-    from mysql.connector import Error
-    MYSQL_CONNECTOR_AVAILABLE = True
-    logger.info("使用 mysql.connector 作为MySQL驱动")
-except ImportError:
-    try:
-        import pymysql
-        pymysql.install_as_MySQLdb()
-        import MySQLdb as mysql
-        from MySQLdb import Error
-        logger.info("使用 pymysql 作为MySQL驱动")
-    except ImportError:
-        logger.warning("未安装MySQL驱动，数据库功能将不可用")
-        logger.warning("请运行: pip install mysql-connector-python 或 pip install pymysql")
-    except Exception as e:
-        logger.warning(f"MySQL驱动导入异常: {e}")
-
 
 class DatabaseManager:
-    """数据库管理类"""
+    """数据库管理类（文件存储版本）"""
 
-    def __init__(self, host: Optional[str] = None, port: int = 3306, 
-                 user: Optional[str] = None, password: Optional[str] = None, 
-                 database: Optional[str] = None):
+    def __init__(self, data_file: Optional[str] = None):
         """
-        初始化数据库连接
+        初始化文件存储管理器
 
         Args:
-            host: 数据库主机地址
-            port: 数据库端口
-            user: 数据库用户名
-            password: 数据库密码
-            database: 数据库名称
+            data_file: 数据文件路径，如果为None则使用默认路径
         """
-        # 安全地获取配置，避免崩溃
         try:
             config = get_config()
-            db_config = config.get('database', {})
+            # 获取数据目录配置
+            paths_config = config.get('paths', {})
+            output_dir = paths_config.get('output_dir', 'data/output')
         except Exception as e:
             logger.warning(f"获取配置失败，使用默认值: {e}")
-            db_config = {}
+            output_dir = 'data/output'
         
-        self.host = host or db_config.get('host', '113.44.144.219')
-        self.port = port or db_config.get('port', 3306)
-        self.user = user or db_config.get('user', 'root')
-        self.password = password or db_config.get('password', '123456')
-        self.database = database or db_config.get('database', 'xupt_sta')
-        self.connection = None
-        self.cursor = None
+        # 确保输出目录存在
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # 数据文件路径
+        if data_file:
+            self.data_file = Path(data_file)
+        else:
+            self.data_file = output_path / 'users.json'
+        
+        # 确保数据文件存在
+        if not self.data_file.exists():
+            self._init_data_file()
+        
+        logger.info(f"使用文件存储: {self.data_file}")
+
+    def _init_data_file(self):
+        """初始化数据文件"""
+        try:
+            with open(self.data_file, 'w', encoding='utf-8') as f:
+                json.dump({'users': []}, f, ensure_ascii=False, indent=2)
+            logger.info(f"创建数据文件: {self.data_file}")
+        except Exception as e:
+            logger.error(f"创建数据文件失败: {e}")
+
+    def _load_data(self) -> dict:
+        """加载数据文件"""
+        try:
+            if not self.data_file.exists():
+                self._init_data_file()
+            
+            with open(self.data_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 确保数据结构正确
+            if 'users' not in data:
+                data['users'] = []
+            
+            return data
+        except json.JSONDecodeError:
+            logger.warning("数据文件格式错误，重新初始化")
+            self._init_data_file()
+            return {'users': []}
+        except Exception as e:
+            logger.error(f"加载数据文件失败: {e}")
+            return {'users': []}
+
+    def _save_data(self, data: dict):
+        """保存数据到文件"""
+        try:
+            # 使用临时文件，确保原子性写入
+            temp_file = self.data_file.with_suffix('.tmp')
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            
+            # 替换原文件
+            if os.name == 'nt':  # Windows
+                if self.data_file.exists():
+                    os.remove(self.data_file)
+                os.rename(temp_file, self.data_file)
+            else:  # Unix/Linux
+                os.replace(temp_file, self.data_file)
+            
+        except Exception as e:
+            logger.error(f"保存数据文件失败: {e}")
+            # 清理临时文件
+            try:
+                if temp_file.exists():
+                    temp_file.unlink()
+            except:
+                pass
+            raise
 
     def connect(self) -> bool:
-        """连接到数据库"""
-        if not MYSQL_CONNECTOR_AVAILABLE and mysql is None:
-            logger.warning("未安装MySQL驱动，请运行: pip install mysql-connector-python 或 pip install pymysql")
-            return False
-        
+        """连接（文件存储版本，总是返回True）"""
         try:
-            if MYSQL_CONNECTOR_AVAILABLE:
-                self.connection = mysql.connector.connect(
-                    host=self.host,
-                    port=self.port,
-                    user=self.user,
-                    password=self.password,
-                    database=self.database,
-                    connect_timeout=5  # 5秒超时
-                )
-            else:
-                self.connection = mysql.connect(
-                    host=self.host,
-                    port=self.port,
-                    user=self.user,
-                    passwd=self.password,
-                    db=self.database,
-                    connect_timeout=5
-                )
-            self.cursor = self.connection.cursor()
-            logger.info("数据库连接成功")
+            # 确保数据文件存在
+            if not self.data_file.exists():
+                self._init_data_file()
+            
+            # 测试读写
+            data = self._load_data()
+            self._save_data(data)
+            
+            logger.info("文件存储初始化成功")
             return True
-        except Error as e:
-            logger.error(f"数据库连接失败: {e}")
-            return False
         except Exception as e:
-            logger.error(f"数据库连接异常: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+            logger.error(f"文件存储初始化失败: {e}")
             return False
+
+    @property
+    def connection(self):
+        """兼容性属性，返回self（表示已连接）"""
+        return self if self.data_file.exists() else None
 
     def disconnect(self):
-        """断开数据库连接"""
-        if self.connection:
-            try:
-                if hasattr(self.connection, 'is_connected') and self.connection.is_connected():
-                    self.cursor.close()
-                    self.connection.close()
-                    logger.info("数据库连接已关闭")
-                elif hasattr(self.connection, 'close'):
-                    self.cursor.close()
-                    self.connection.close()
-                    logger.info("数据库连接已关闭")
-            except Exception as e:
-                logger.error(f"关闭数据库连接失败: {e}")
+        """断开连接（文件存储版本，无需操作）"""
+        logger.info("文件存储连接已关闭")
 
     def create_user_table(self) -> bool:
-        """创建用户表"""
+        """创建用户表（文件存储版本，确保数据文件存在）"""
         try:
-            create_table_query = """
-            CREATE TABLE IF NOT EXISTS mv_user (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-            self.cursor.execute(create_table_query)
-            self.connection.commit()
-            logger.info("用户表创建成功或已存在")
+            if not self.data_file.exists():
+                self._init_data_file()
+            else:
+                # 验证文件格式
+                data = self._load_data()
+                if 'users' not in data:
+                    data['users'] = []
+                    self._save_data(data)
+            
+            logger.info("用户数据文件检查/创建成功")
             return True
-        except Error as e:
-            logger.error(f"创建用户表失败: {e}")
+        except Exception as e:
+            logger.error(f"创建用户数据文件失败: {e}")
             return False
 
     @staticmethod
@@ -164,19 +177,32 @@ class DatabaseManager:
             return False, "密码长度至少为6个字符"
 
         try:
+            data = self._load_data()
+            users = data.get('users', [])
+            
+            # 检查用户是否已存在
+            for user in users:
+                if user.get('username') == username:
+                    return False, "用户名已存在"
+            
+            # 添加新用户
             hashed_password = self.hash_password(password)
-            # 修复：使用正确的字段名
-            insert_query = "INSERT INTO mv_user (username, password) VALUES (%s, %s)"
-            self.cursor.execute(insert_query, (username, hashed_password))
-            self.connection.commit()
+            new_user = {
+                'id': len(users) + 1,
+                'username': username,
+                'password': hashed_password,
+                'created_at': self._get_timestamp()
+            }
+            users.append(new_user)
+            data['users'] = users
+            
+            self._save_data(data)
             logger.info(f"用户注册成功: {username}")
             return True, "注册成功"
-        except Error as e:
-            error_msg = str(e)
-            if "Duplicate entry" in error_msg or "UNIQUE" in error_msg:
-                return False, "用户名已存在"
-            logger.error(f"注册失败: {e}")
-            return False, f"注册失败: {error_msg}"
+            
+        except Exception as e:
+            logger.error(f"注册用户失败: {e}")
+            return False, f"注册失败: {e}"
 
     def login_user(self, username: str, password: str) -> Tuple[bool, str]:
         """
@@ -193,34 +219,50 @@ class DatabaseManager:
             return False, "用户名和密码不能为空"
 
         try:
-            # 修复：使用正确的字段名
-            query = "SELECT password FROM mv_user WHERE username = %s"
-            self.cursor.execute(query, (username,))
-            result = self.cursor.fetchone()
-
-            if result is None:
+            data = self._load_data()
+            users = data.get('users', [])
+            
+            # 查找用户
+            user = None
+            for u in users:
+                if u.get('username') == username:
+                    user = u
+                    break
+            
+            if user is None:
                 return False, "用户不存在"
-
-            stored_password = result[0]
+            
+            # 验证密码
+            stored_password = user.get('password', '')
             hashed_input_password = self.hash_password(password)
-
+            
             # 兼容旧数据（明文密码）和新数据（哈希密码）
             if stored_password == hashed_input_password or stored_password == password:
                 logger.info(f"用户登录成功: {username}")
                 return True, "登录成功"
             else:
                 return False, "密码错误"
-        except Error as e:
+                
+        except Exception as e:
             logger.error(f"登录失败: {e}")
             return False, f"登录失败: {e}"
 
     def user_exists(self, username: str) -> bool:
         """检查用户是否存在"""
         try:
-            query = "SELECT id FROM mv_user WHERE username = %s"
-            self.cursor.execute(query, (username,))
-            return self.cursor.fetchone() is not None
-        except Error as e:
+            data = self._load_data()
+            users = data.get('users', [])
+            
+            for user in users:
+                if user.get('username') == username:
+                    return True
+            return False
+        except Exception as e:
             logger.error(f"检查用户失败: {e}")
             return False
 
+    @staticmethod
+    def _get_timestamp() -> str:
+        """获取当前时间戳字符串"""
+        from datetime import datetime
+        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')

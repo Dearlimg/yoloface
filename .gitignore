@@ -41,6 +41,8 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
+users.json
+data/output/users.json
 
 # Model files (large)
 *.caffemodel
